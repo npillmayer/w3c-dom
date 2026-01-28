@@ -1,0 +1,135 @@
+digraph g {                                                                                                             
+  graph [labelloc="t" label="" splines=true overlap=false rankdir = "LR"];
+  graph [Helvetica = "helvetica" fontsize=14] ;
+   node [fontname = "Helvetica" fontsize=14] ;
+   edge [fontname = "Helvetica" fontsize=14] ;
+
+node00001	[ label="#document" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+
+node00002	[ label="html" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+
+node00003	[ label="head" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+
+node00004	[ label="\"\\n\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00003 -> node00004 [weight=1] ;
+
+node00005	[ label="\"\\n\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00003 -> node00005 [weight=1] ;
+node00002 -> node00003 [weight=1] ;
+
+node00006	[ label="body" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+pg0x140000ae5e0 [ style="filled" penwidth=1 fillcolor="ivory3" shape="Mrecord" fontsize=12
+    label=<<table border="0" cellborder="0" cellpadding="2" cellspacing="0" bgcolor="ivory3">
+      <tr><td bgcolor="azure4" align="center" colspan="2"><font color="white">Border</font></td></tr>
+      
+      <tr><td align="right">border-top-color:</td><td>red</td></tr>
+      
+      <tr><td align="right">border-right-color:</td><td>red</td></tr>
+      
+      <tr><td align="right">border-bottom-color:</td><td>red</td></tr>
+      
+      <tr><td align="right">border-left-color:</td><td>red</td></tr>
+      
+    </table>> ] ;
+node00006 -> pg0x140000ae5e0 [dir=none weight=1 style="dashed"] ;
+
+node00007	[ label="\"\\n␣␣\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00006 -> node00007 [weight=1] ;
+
+node00008	[ label="p" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+pg0x14000318620 [ style="filled" penwidth=1 fillcolor="ivory3" shape="Mrecord" fontsize=12
+    label=<<table border="0" cellborder="0" cellpadding="2" cellspacing="0" bgcolor="ivory3">
+      <tr><td bgcolor="azure4" align="center" colspan="2"><font color="white">Margins</font></td></tr>
+      
+      <tr><td align="right">margin-bottom:</td><td>10pt</td></tr>
+      
+    </table>> ] ;
+node00008 -> pg0x14000318620 [dir=none weight=1 style="dashed"] ;
+
+node00009	[ label="\"The␣quick␣...\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00008 -> node00009 [weight=1] ;
+node00006 -> node00008 [weight=1] ;
+
+node00010	[ label="\"\\n␣␣\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00006 -> node00010 [weight=1] ;
+
+node00011	[ label="p" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+pg0x140000ae760 [ style="filled" penwidth=1 fillcolor="ivory3" shape="Mrecord" fontsize=12
+    label=<<table border="0" cellborder="0" cellpadding="2" cellspacing="0" bgcolor="ivory3">
+      <tr><td bgcolor="azure4" align="center" colspan="2"><font color="white">Margins</font></td></tr>
+      
+      <tr><td align="right">margin-bottom:</td><td>10pt</td></tr>
+      
+    </table>> ] ;
+node00011 -> pg0x140000ae760 [dir=none weight=1 style="dashed"] ;
+pg0x140000ae720 [ style="filled" penwidth=1 fillcolor="ivory3" shape="Mrecord" fontsize=12
+    label=<<table border="0" cellborder="0" cellpadding="2" cellspacing="0" bgcolor="ivory3">
+      <tr><td bgcolor="azure4" align="center" colspan="2"><font color="white">Padding</font></td></tr>
+      
+      <tr><td align="right">padding-top:</td><td>20pt</td></tr>
+      
+    </table>> ] ;
+pg0x140000ae760 -> pg0x140000ae720 [dir=none weight=1 style="dashed"] ;
+
+node00012	[ label="\"Hello␣\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00011 -> node00012 [weight=1] ;
+
+node00013	[ label="b" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+
+node00014	[ label="\"World\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00013 -> node00014 [weight=1] ;
+node00011 -> node00013 [weight=1] ;
+
+node00015	[ label="\"!\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00011 -> node00015 [weight=1] ;
+node00006 -> node00011 [weight=1] ;
+
+node00016	[ label="\"\\n␣␣\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00006 -> node00016 [weight=1] ;
+
+node00017	[ label="p" shape=ellipse style=filled fillcolor=lightblue3 ] ;
+
+pg0x140000ae660 [ style="filled" penwidth=1 fillcolor="ivory3" shape="Mrecord" fontsize=12
+    label=<<table border="0" cellborder="0" cellpadding="2" cellspacing="0" bgcolor="ivory3">
+      <tr><td bgcolor="azure4" align="center" colspan="2"><font color="white">Margins</font></td></tr>
+      
+      <tr><td align="right">margin-bottom:</td><td>10pt</td></tr>
+      
+    </table>> ] ;
+node00017 -> pg0x140000ae660 [dir=none weight=1 style="dashed"] ;
+pg0x140000ae6a0 [ style="filled" penwidth=1 fillcolor="ivory3" shape="Mrecord" fontsize=12
+    label=<<table border="0" cellborder="0" cellpadding="2" cellspacing="0" bgcolor="ivory3">
+      <tr><td bgcolor="azure4" align="center" colspan="2"><font color="white">Padding</font></td></tr>
+      
+      <tr><td align="right">padding-left:</td><td>5px</td></tr>
+      
+    </table>> ] ;
+pg0x140000ae660 -> pg0x140000ae6a0 [dir=none weight=1 style="dashed"] ;
+
+node00018	[ label="\"This␣is␣a␣...\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00017 -> node00018 [weight=1] ;
+node00006 -> node00017 [weight=1] ;
+
+node00019	[ label="\"\\n\\n\"" shape=box style=filled fillcolor=grey95 fontname="Courier" fontsize=11.0 ] ;
+
+node00006 -> node00019 [weight=1] ;
+node00002 -> node00006 [weight=1] ;
+node00001 -> node00002 [weight=1] ;
+}
