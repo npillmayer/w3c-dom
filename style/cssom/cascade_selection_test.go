@@ -1,0 +1,25 @@
+package cssom
+
+import (
+	"github.com/npillmayer/w3c-dom/style"
+	"golang.org/x/net/html"
+	"testing"
+)
+
+func TestInlinePriorityAndIndependentProperties(t *testing.T) {
+	inline := newLocalPseudoRule("color:green")
+	list := matchesList{propertiesTable: []propertyPlusSpecifityType{
+		{rule: inline, propertyKey: "color", propertyValue: "green", spec: 0},
+		{rule: nil, propertyKey: "color", propertyValue: "blue", spec: 1000},
+		{rule: nil, propertyKey: "font-size", propertyValue: "10px", spec: 10},
+	}}
+	if !byHighestSpecifity(list.propertiesTable).Less(0, 1) {
+		t.Fatal("inline lost to selector")
+	}
+	// Higher priority duplicate must not prevent independent lower rules.
+	root := setupStyledNodeTree(&html.Node{Type: html.DocumentNode}, NewCSSOM([]style.KeyValue{{Key: "font-size", Value: "medium"}}).defaultProperties)
+	props := list.createStyleGroups(root.Parent())
+	if value, ok := props.Property("font-size"); !ok || value != style.Property("10px") {
+		t.Fatalf("size lost: %q", value)
+	}
+}

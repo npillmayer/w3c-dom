@@ -219,9 +219,19 @@ func (matches *matchesList) mergeMatchesWith(m *matchesList) *matchesList {
 type byHighestSpecifity []propertyPlusSpecifityType
 
 // make specifities sortable by highest sp.spec
-func (sp byHighestSpecifity) Len() int           { return len(sp) }
-func (sp byHighestSpecifity) Swap(i, j int)      { sp[i], sp[j] = sp[j], sp[i] }
-func (sp byHighestSpecifity) Less(i, j int) bool { return sp[i].spec > sp[j].spec }
+func (sp byHighestSpecifity) Len() int      { return len(sp) }
+func (sp byHighestSpecifity) Swap(i, j int) { sp[i], sp[j] = sp[j], sp[i] }
+func (sp byHighestSpecifity) Less(i, j int) bool {
+	if sp[i].important != sp[j].important {
+		return sp[i].important
+	}
+	_, inlineI := sp[i].rule.(localPseudoRuleType)
+	_, inlineJ := sp[j].rule.(localPseudoRuleType)
+	if inlineI != inlineJ {
+		return inlineI
+	}
+	return sp[i].spec > sp[j].spec
+}
 
 // This is a small helper to print out a table with rule-matches for a node.
 func (matches *matchesList) String() string {
@@ -383,7 +393,7 @@ func (matches *matchesList) createStyleGroups(parent *tree.Node[*styledtree.StyN
 			// already present in current properties map
 			// this must be from previous set with higher specifity
 			// => do nothing
-			break
+			continue
 		}
 		groupname := style.GroupNameFromPropertyKey(pspec.propertyKey)
 		group := pmap.Group(groupname)
@@ -395,10 +405,13 @@ func (matches *matchesList) createStyleGroups(parent *tree.Node[*styledtree.StyN
 			if pg == nil {
 				panic(fmt.Sprintf("Cannot find ancestor with prop-group %s -- did you create global properties?", groupname))
 			}
-			group, isNew := pg.ForkOnProperty(pspec.propertyKey, pspec.propertyValue, true)
-			if isNew { // a new property group has been created
-				pmap = pmap.AddAllFromGroup(group, true) // put it into the group map
-			}
+			// An explicit declaration must remain local even if its value equals
+			// an ancestor's default. Reusing the ancestor also lets a later
+			// declaration in this group mutate styles shared by other nodes.
+			group = style.NewPropertyGroup(groupname)
+			group.Parent = pg
+			group.Set(pspec.propertyKey, pspec.propertyValue)
+			pmap = pmap.AddAllFromGroup(group, true)
 		}
 		done[pspec.propertyKey] = true // remember we're done with this property
 	}
