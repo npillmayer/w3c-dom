@@ -73,9 +73,9 @@ func (cssom CSSOM) AddStylesForScope(scope *html.Node, css StyleSheet, source Pr
 // Optimize some day (see
 // https://hacks.mozilla.org/2017/08/inside-a-super-fast-css-engine-quantum-css-aka-stylo/).
 type rulesTreeType struct {
-	stylesheets *sync.Map                    // of type html.Node -> []stylesheetType
-	selectors   map[string]cascadia.Selector // cache of compiled selectors
-	source      PropertySource               // where do these rules come from?
+	stylesheets *sync.Map      // of type html.Node -> []stylesheetType
+	selectors   *sync.Map      // string -> cascadia.SelectorGroup
+	source      PropertySource // where do these rules come from?
 }
 
 // ad-hoc container type for stylesheets and their origin.
@@ -88,7 +88,7 @@ type stylesheetType struct {
 func newRulesTree() *rulesTreeType {
 	rt := &rulesTreeType{}
 	rt.stylesheets = &sync.Map{}
-	rt.selectors = make(map[string]cascadia.Selector)
+	rt.selectors = &sync.Map{}
 	return rt
 }
 
@@ -194,8 +194,15 @@ var rootElement = &html.Node{Data: "root"}
 // In a second step it collects all the properties set in those rules,
 // then orderes them by specifity.
 type matchesList struct {
-	matchingRules   []Rule
+	matchingRules   []matchedRule
 	propertiesTable []propertyPlusSpecifityType
+}
+
+// matchedRule retains the specificity of the strongest selector-list branch
+// that matched this node. Unmatched branches must not increase its priority.
+type matchedRule struct {
+	rule Rule
+	spec cascadia.Specificity
 }
 
 // Rule-matchings are collected from more than one stylesheet. Matching
@@ -230,7 +237,10 @@ func (sp byHighestSpecifity) Less(i, j int) bool {
 	if inlineI != inlineJ {
 		return inlineI
 	}
-	return sp[i].spec > sp[j].spec
+	if sp[i].spec != sp[j].spec {
+		return sp[j].spec.Less(sp[i].spec)
+	}
+	return sp[i].sourceOrder > sp[j].sourceOrder
 }
 
 // This is a small helper to print out a table with rule-matches for a node.
@@ -238,7 +248,7 @@ func (matches *matchesList) String() string {
 	s := fmt.Sprintf("match of %d rules:\n", len(matches.matchingRules))
 	s += "Src +-- Spec. --+------------- Key --------------+------- Value ---------------\n"
 	for _, sp := range matches.propertiesTable {
-		s += fmt.Sprintf("%3d | %9d | %30s | %s\n", sp.source, sp.spec, sp.propertyKey, sp.propertyValue)
+		s += fmt.Sprintf("%3d | %9v | %30s | %s\n", sp.source, sp.spec, sp.propertyKey, sp.propertyValue)
 	}
 	return s
 }
@@ -250,52 +260,49 @@ func (matches *matchesList) String() string {
 //
 // Will return a slice of CSS rules matched for h.
 func (rt *rulesTreeType) FilterMatchesFor(h *html.Node) *matchesList {
-	//list := &matchesList{}
-	matchingRules := make([]Rule, 0, 3)
-	sheets := rt.StylesheetsForHTMLNode(rootElement)
-	for _, s := range sheets {
-		rules := s.stylesheet.Rules()
-		tracer().Debugf("Stylesheet has %d rules", len(rules))
-		for _, rule := range rules {
-			tracer().Debugf("Now try to match for HTML = %v", h.Data)
-			if rt.matchRuleForHTMLNode(h, rule) {
-				matchingRules = append(matchingRules, rule)
+	matchingRules := make([]matchedRule, 0, 3)
+	collect := func(sheets []stylesheetType) {
+		for _, sheet := range sheets {
+			for _, rule := range sheet.stylesheet.Rules() {
+				if spec, ok := rt.matchRuleForHTMLNode(h, rule); ok {
+					matchingRules = append(matchingRules, matchedRule{rule: rule, spec: spec})
+				}
 			}
 		}
 	}
-	sheets = rt.StylesheetsForHTMLNode(h)
-	for _, s := range sheets {
-		for _, rule := range s.stylesheet.Rules() {
-			if rt.matchRuleForHTMLNode(h, rule) {
-				matchingRules = append(matchingRules, rule)
-			}
-		}
-	}
-	return &matchesList{matchingRules, nil}
+	// Slice order retains registration/rule order across sheets. The matched
+	// rule index is a separate tie breaker, never part of selector specificity.
+	collect(rt.StylesheetsForHTMLNode(rootElement))
+	collect(rt.StylesheetsForHTMLNode(h))
+	return &matchesList{matchingRules: matchingRules}
 }
 
-func (rt *rulesTreeType) matchRuleForHTMLNode(h *html.Node, rule Rule) bool {
+func (rt *rulesTreeType) matchRuleForHTMLNode(h *html.Node, rule Rule) (cascadia.Specificity, bool) {
+	var spec cascadia.Specificity
 	selectorString := rule.Selector()
 	if selectorString == "" { // style-attribute local for this HTML node
-		//matchingRules = append(matchingRules, rule)
-		return true
-	} // else try to match selector for this rule against HTML node
-	var sel cascadia.Selector
-	found := false
-	if sel, found = rt.selectors[selectorString]; !found {
-		var err error
-		sel, err = cascadia.Compile(selectorString)
+		return spec, true
+	}
+	cached, found := rt.selectors.Load(selectorString)
+	if !found {
+		selectors, err := cascadia.ParseGroup(selectorString)
 		if err != nil {
 			tracer().Errorf("CSS selector seems not to work: %s", selectorString)
-			return false
+			return spec, false
 		}
-		rt.selectors[selectorString] = sel
+		cached, _ = rt.selectors.LoadOrStore(selectorString, selectors)
 	}
-	if sel.Match(h) {
-		//list.matchingRules = append(list.matchingRules, rule)
-		return true
+	matched := false
+	for _, selector := range cached.(cascadia.SelectorGroup) {
+		if selector.Match(h) {
+			candidate := selector.Specificity()
+			if !matched || spec.Less(candidate) {
+				spec = candidate
+			}
+			matched = true
+		}
 	}
-	return false
+	return spec, matched
 }
 
 // SortProperties takes a slice of CSS rules (matched for an HTML node) and
@@ -308,7 +315,8 @@ func (rt *rulesTreeType) matchRuleForHTMLNode(h *html.Node, rule Rule) bool {
 // Finally all property entries are sorted by specifity of the enclosing rule.
 func (matches *matchesList) SortProperties(splitters []CompoundPropertiesSplitter) {
 	var proptable []propertyPlusSpecifityType
-	for rno, rule := range matches.matchingRules {
+	for rno, match := range matches.matchingRules {
+		rule := match.rule
 		for _, propertyKey := range rule.Properties() {
 			value := style.Property(rule.Value(propertyKey))
 			props, err := splitCompoundProperty(splitters, propertyKey, value)
@@ -317,19 +325,23 @@ func (matches *matchesList) SortProperties(splitters []CompoundPropertiesSplitte
 				for _, kv := range props {
 					key := kv.Key
 					val := kv.Value
-					sp := propertyPlusSpecifityType{Author, rule, key, val, rule.IsImportant(propertyKey), 0}
-					sp.calcSpecifity(rno)
+					sp := propertyPlusSpecifityType{
+						source: Author, rule: rule, propertyKey: key, propertyValue: val,
+						important: rule.IsImportant(propertyKey), spec: match.spec, sourceOrder: rno,
+					}
 					proptable = append(proptable, sp)
 				}
 			} else {
-				sp := propertyPlusSpecifityType{Author, rule, propertyKey, value, rule.IsImportant(propertyKey), 0}
-				sp.calcSpecifity(rno)
+				sp := propertyPlusSpecifityType{
+					source: Author, rule: rule, propertyKey: propertyKey, propertyValue: value,
+					important: rule.IsImportant(propertyKey), spec: match.spec, sourceOrder: rno,
+				}
 				proptable = append(proptable, sp)
 			}
 		}
 	}
 	if len(proptable) > 0 {
-		sort.Sort(byHighestSpecifity(proptable))
+		sort.Stable(byHighestSpecifity(proptable))
 		matches.propertiesTable = proptable
 	}
 	if tracer().GetTraceLevel() >= tracing.LevelDebug {
@@ -340,46 +352,13 @@ func (matches *matchesList) SortProperties(splitters []CompoundPropertiesSplitte
 // --- Specifity of rules -----------------------------------------------
 
 type propertyPlusSpecifityType struct {
-	source        PropertySource // where the property has been defined
-	rule          Rule           // the rule containing the property definition
-	propertyKey   string         // CSS property name
-	propertyValue style.Property // raw string value
-	important     bool           // marked as !IMPORTANT ?
-	spec          uint32         // specifity value to calculate; higher is more
-}
-
-// CalcSpecifity calculates an approximation to the true W3C specifity.
-// https://www.smashingmagazine.com/2007/07/css-specificity-things-you-should-know/
-//
-// no is a sequence number for rules, ensuring that later rules override
-// previously defined rules / properties.
-func (sp *propertyPlusSpecifityType) calcSpecifity(no int) {
-	if sp.rule.IsImportant(sp.propertyKey) {
-		sp.spec = 99999 // max
-		return
-	}
-	sp.spec = uint32(sp.source-1) * 1000
-	selectorstring := sp.rule.Selector()
-	// simple "parsing" = rough estimate...
-	// alternatively use code from cascadia or from
-	// https://godoc.org/github.com/ericchiang/css
-	sels := strings.Fields(selectorstring)
-	var selcnt uint32
-	var idcnt uint32
-	var classcnt uint32
-	for _, sel := range sels {
-		selcnt++
-		if strings.ContainsRune(sel, ':') {
-			selcnt++ // count double
-		}
-		if strings.ContainsAny(sel, ".[:") {
-			classcnt++
-		}
-		if strings.HasPrefix(sel, "#") {
-			idcnt++
-		}
-	}
-	sp.spec += selcnt*10 + classcnt*100 + idcnt*1000 + uint32(no)
+	source        PropertySource       // where the property has been defined
+	rule          Rule                 // the rule containing the property definition
+	propertyKey   string               // CSS property name
+	propertyValue style.Property       // raw string value
+	important     bool                 // marked as !IMPORTANT ?
+	spec          cascadia.Specificity // IDs, classes/attributes/pseudo-classes, types
+	sourceOrder   int                  // later rule wins only when specificity ties
 }
 
 // --- Style Property Groups --------------------------------------------

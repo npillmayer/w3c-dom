@@ -9,9 +9,9 @@ import (
 func TestInlinePriorityAndIndependentProperties(t *testing.T) {
 	inline := newLocalPseudoRule("color:green")
 	list := matchesList{propertiesTable: []propertyPlusSpecifityType{
-		{rule: inline, propertyKey: "color", propertyValue: "green", spec: 0},
-		{rule: nil, propertyKey: "color", propertyValue: "blue", spec: 1000},
-		{rule: nil, propertyKey: "font-size", propertyValue: "10px", spec: 10},
+		{rule: inline, propertyKey: "color", propertyValue: "green", spec: [3]int{}},
+		{rule: nil, propertyKey: "color", propertyValue: "blue", spec: [3]int{1, 0, 0}},
+		{rule: nil, propertyKey: "font-size", propertyValue: "10px", spec: [3]int{0, 0, 1}},
 	}}
 	if !byHighestSpecifity(list.propertiesTable).Less(0, 1) {
 		t.Fatal("inline lost to selector")
