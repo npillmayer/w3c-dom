@@ -14,3 +14,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 )
+
+replace github.com/npillmayer/tree => ../tree
+
+replace github.com/npillmayer/schuko => ../schuko
