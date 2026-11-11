@@ -218,6 +218,8 @@ func (m *PMatchExpr[T]) OneOf(patterns PositionPatterns[T]) T {
 	switch {
 	case m.pos.kind == positionUnset:
 		return patterns.Unset
+	case m.pos.kind == positionStatic:
+		return patterns.Static
 	case m.pos.kind == positionAbsolute:
 		return patterns.Absolute
 	case m.pos.kind == positionRelative:
@@ -253,7 +255,7 @@ func (p PositionT) IsRelative() bool {
 
 // IsAbsolute returns true if d represents a valid absolute position.
 func (p PositionT) IsAbsolute() bool {
-	return p.kind == positionUnset
+	return p.kind == positionAbsolute
 }
 
 // IsFixed returns true if d represents a fixed position.

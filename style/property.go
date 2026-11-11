@@ -24,7 +24,7 @@ func tracer() tracing.Trace {
 
 // Property is a raw value for a CSS property. For example, with
 //
-//     color: black
+//	color: black
 //
 // a property value of "black" is set. The main purpose of wrapping
 // the raw string value into type Property is to provide a set of
@@ -110,6 +110,7 @@ func (pg *PropertyGroup) Properties() []KeyValue {
 
 // IsSet is a predicated wether a property is set within this group.
 func (pg *PropertyGroup) IsSet(key string) bool {
+	key = CanonicalPropertyKey(key)
 	if pg.propsDict == nil {
 		return false
 	}
@@ -119,8 +120,9 @@ func (pg *PropertyGroup) IsSet(key string) bool {
 
 // Get a property's value.
 //
-// Style property values are always converted to lower case.
+// Property values preserve their original case.
 func (pg *PropertyGroup) Get(key string) (Property, bool) {
+	key = CanonicalPropertyKey(key)
 	if pg.propsDict == nil {
 		return NullStyle, false
 	}
@@ -130,9 +132,9 @@ func (pg *PropertyGroup) Get(key string) (Property, bool) {
 
 // Set a property's value. Overwrites an existing value, if present.
 //
-// Style property values are always converted to lower case.
+// Property values preserve their original case.
 func (pg *PropertyGroup) Set(key string, p Property) {
-	p = Property(strings.ToLower(string(p)))
+	key = CanonicalPropertyKey(key)
 	if pg.propsDict == nil {
 		pg.propsDict = make(map[string]Property)
 	}
@@ -142,6 +144,7 @@ func (pg *PropertyGroup) Set(key string, p Property) {
 // Add a property's value. Does not overwrite an existing value, i.e., does nothing
 // if a value is already set.
 func (pg *PropertyGroup) Add(key string, p Property) {
+	key = CanonicalPropertyKey(key)
 	if pg.propsDict == nil {
 		pg.propsDict = make(map[string]Property)
 	}
@@ -172,14 +175,12 @@ func (pg *PropertyGroup) ForkOnProperty(key string, p Property, cascade bool) (*
 	return npg, true
 }
 
-// Cascade finds the ancesting PropertyGroup containing the given property-key.
+// Cascade finds the first group containing a nonempty value for key.
+// It returns nil if the key is absent, including on a nil receiver.
 func (pg *PropertyGroup) Cascade(key string) *PropertyGroup {
 	it := pg
 	for it != nil && !it.IsSet(key) { // stopper is default partial
 		it = it.Parent
-	}
-	if it == nil {
-		panic(fmt.Sprintf("styling: no property group %s found with key '%s'", pg.name, key))
 	}
 	return it
 }
@@ -187,15 +188,16 @@ func (pg *PropertyGroup) Cascade(key string) *PropertyGroup {
 // GroupNameFromPropertyKey returns the style property group name for a
 // style property.
 // Example:
-//    GroupNameFromPropertyKey("margin-top") => "Margins"
+//
+//	GroupNameFromPropertyKey("margin-top") => "Margins"
 //
 // Unknown style property keys will return a group name of "X".
 func GroupNameFromPropertyKey(key string) string {
-	groupname, found := groupNameFromPropertyKey[key]
-	if !found {
-		groupname = "X"
+	key = CanonicalPropertyKey(key)
+	if meta, ok := propertyRegistry[key]; ok {
+		return meta.group
 	}
-	return groupname
+	return PGX
 }
 
 // Symbolic names for string literals, denoting PropertyGroups.
@@ -211,86 +213,30 @@ const (
 	PGX         = "X"
 )
 
-var groupNameFromPropertyKey = map[string]string{
-	"margin-top":                 PGMargins, // Margins
-	"margin-left":                PGMargins,
-	"margin-right":               PGMargins,
-	"margin-bottom":              PGMargins,
-	"padding-top":                PGPadding, // Padding
-	"padding-left":               PGPadding,
-	"padding-right":              PGPadding,
-	"padding-bottom":             PGPadding,
-	"border-top-color":           PGBorder, // Border
-	"border-left-color":          "Border",
-	"border-right-color":         "Border",
-	"border-bottom-color":        "Border",
-	"border-top-width":           "Border",
-	"border-left-width":          "Border",
-	"border-right-width":         "Border",
-	"border-bottom-width":        "Border",
-	"border-top-style":           "Border",
-	"border-left-style":          "Border",
-	"border-right-style":         "Border",
-	"border-bottom-style":        "Border",
-	"border-top-left-radius":     "Border",
-	"border-top-right-radius":    "Border",
-	"border-bottom-left-radius":  "Border",
-	"border-bottom-right-radius": "Border",
-	"width":                      "Dimension", // Dimension
-	"height":                     "Dimension",
-	"min-width":                  "Dimension",
-	"min-height":                 "Dimension",
-	"max-width":                  "Dimension",
-	"max-height":                 "Dimension",
-	"display":                    PGDisplay, // Display
-	"float":                      PGDisplay,
-	"visibility":                 PGDisplay,
-	"position":                   PGDisplay,
-	"flow-into":                  PGRegion,
-	"flow-from":                  PGRegion,
-	"color":                      PGColor,
-	"background-color":           PGColor,
-	"direction":                  PGText,
-	"white-space":                PGText,
-	"word-spacing":               PGText,
-	"letter-spacing":             PGText,
-	"word-break":                 PGText,
-	"word-wrap":                  PGText,
-}
-
-// IsCascading returns wether the standard behaviour for a propery is to be
-// inherited or not, i.e., a call to retrieve its value will cascade.
-func IsCascading(key string) bool {
-	if strings.HasPrefix(key, "list-style") {
-		return true
-	}
-	switch key {
-	case "color", "cursor", "direction", "position", "flow-into", "flow-from":
-		return true
-	case "letter-spacing", "line-height", "quotes", "visibility", "white-space":
-		return true
-	case "word-spacing", "word-break", "word-wrap":
-		return true
-	}
-	return false
-}
+// IsCascading reports whether an absent property inherits by default.
+// Unknown extension properties do not inherit implicitly.
+func IsCascading(key string) bool { return propertyRegistry[CanonicalPropertyKey(key)].inherited }
 
 // SplitCompoundProperty splits up a shortcut property into its individual
 // components. Returns a slice of key-value pairs representing the
 // individual (fine grained) style properties.
 // Example:
-//    SplitCompountProperty("padding", "3px")
+//
+//	SplitCompountProperty("padding", "3px")
+//
 // will return
-//    "padding-top"    => "3px"
-//    "padding-right"  => "3px"
-//    "padding-bottom" => "3px"
-//    "padding-left  " => "3px"
+//
+//	"padding-top"    => "3px"
+//	"padding-right"  => "3px"
+//	"padding-bottom" => "3px"
+//	"padding-left  " => "3px"
+//
 // For the logic behind this, refer to e.g.
 // https://www.w3schools.com/css/css_padding.asp .
 func SplitCompoundProperty(key string, value Property) ([]KeyValue, error) {
 	fields := strings.Fields(value.String())
 	switch key {
-	case "margins":
+	case "margin", "margins": // retain the historical alias
 		return feazeCompound4("margin", "", fourDirs, fields)
 	case "padding":
 		return feazeCompound4("padding", "", fourDirs, fields)
@@ -301,7 +247,24 @@ func SplitCompoundProperty(key string, value Property) ([]KeyValue, error) {
 	case "border-style":
 		return feazeCompound4("border", "style", fourDirs, fields)
 	case "border-radius":
-		return feazeCompound4("border", "style", fourCorners, fields)
+		parts := strings.Split(value.String(), "/")
+		if len(parts) > 2 {
+			return nil, fmt.Errorf("border-radius accepts at most one slash")
+		}
+		horizontal, err := feazeCompound4("border", "radius", fourCorners, strings.Fields(parts[0]))
+		if err != nil {
+			return nil, err
+		}
+		if len(parts) == 2 {
+			vertical, err := feazeCompound4("border", "radius", fourCorners, strings.Fields(parts[1]))
+			if err != nil {
+				return nil, err
+			}
+			for i := range horizontal {
+				horizontal[i].Value += " " + vertical[i].Value
+			}
+		}
+		return horizontal, nil
 	}
 	return nil, fmt.Errorf("not recognized as compound property: %s", key)
 }
@@ -311,7 +274,7 @@ func SplitCompoundProperty(key string, value Property) ([]KeyValue, error) {
 func feazeCompound4(pre string, suf string, dirs [4]string, fields []string) ([]KeyValue, error) {
 	l := len(fields)
 	if l == 0 || l > 4 {
-		return nil, fmt.Errorf("expecting 1-3 values for %s-%s", pre, suf)
+		return nil, fmt.Errorf("expecting 1-4 values for %s-%s", pre, suf)
 	}
 	r := make([]KeyValue, 4)
 	r[0] = KeyValue{p(pre, suf, dirs[0]), Property(fields[0])}
@@ -337,7 +300,7 @@ func feazeCompound4(pre string, suf string, dirs [4]string, fields []string) ([]
 }
 
 var fourDirs = [4]string{"top", "right", "bottom", "left"}
-var fourCorners = [4]string{"top-right", "bottom-right", "bottom-left", "top-left"}
+var fourCorners = [4]string{"top-left", "top-right", "bottom-right", "bottom-left"}
 
 func p(prefix string, suffix string, tag string) string {
 	if suffix == "" {
@@ -355,6 +318,8 @@ func p(prefix string, suffix string, tag string) string {
 // A property map is the entity styling a DOM node: a DOM node links to a property map,
 // which contains zero or more property groups. Property maps may share property groups.
 type PropertyMap struct {
+	defaults  bool
+	overrides map[string]Property
 	// As CSS defines a whole lot of properties, we segment them into logical groups.
 	m map[string]*PropertyGroup // into struct to make it opaque for clients
 }
@@ -430,13 +395,16 @@ func (pmap *PropertyMap) AddAllFromGroup(group *PropertyGroup, overwrite bool) *
 	return pmap
 }
 
-// Add adds a property to this property map, e.g.,
+// Add adds a property to this property map. A zero-value map is initialized;
+// a nil receiver is left unchanged. For example,
 //
-//    pm.Add("funny-margin", "big")
-//
+//	pm.Add("funny-margin", "big")
 func (pmap *PropertyMap) Add(key string, value Property) {
 	if pmap == nil {
 		return
+	}
+	if pmap.m == nil {
+		pmap.m = make(map[string]*PropertyGroup)
 	}
 	groupname := GroupNameFromPropertyKey(key)
 	group, found := pmap.m[groupname]
@@ -445,4 +413,13 @@ func (pmap *PropertyMap) Add(key string, value Property) {
 		pmap.m[groupname] = group
 	}
 	group.Set(key, value)
+}
+
+// CanonicalPropertyKey returns the storage and cascade key for a property alias.
+// Custom property names are unchanged.
+func CanonicalPropertyKey(key string) string {
+	if key == "word-wrap" {
+		return "overflow-wrap"
+	}
+	return key
 }

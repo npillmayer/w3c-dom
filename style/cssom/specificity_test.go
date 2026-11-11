@@ -104,3 +104,34 @@ func specificityColors(t *testing.T, markup string, sheets ...string) map[string
 	visit(root)
 	return colors
 }
+
+func TestInlineImportanceCascade(t *testing.T) {
+	for _, tc := range []struct{ inline, want string }{
+		{"color:green!important", "green"},
+		{"color:green;color:yellow", "red"},
+		{"color:green!important;color:yellow", "green"},
+		{"color:green!important;color:yellow!important", "yellow"},
+	} {
+		got := specificityColors(t, `<p id="x" style="`+tc.inline+`">text</p>`, `#x {color:red!important}`)
+		if got["x"] != tc.want {
+			t.Errorf("%s: got %s", tc.inline, got["x"])
+		}
+	}
+}
+
+func TestStylesheetDuplicateCascade(t *testing.T) {
+	for _, tc := range []struct{ sheet, want string }{
+		{`p {color:red;color:blue}`, "blue"},
+		{`p {color:red!important;color:blue}`, "red"},
+		{`p {color:red;color:blue!important}`, "blue"},
+		{`p {color:red!important;color:blue!important}`, "blue"},
+		{`p {color:red!important;color:blue} #x {color:green}`, "red"},
+		{`p {color:red;color:blue} p {color:green}`, "green"},
+		{`p {color:red!important;color:blue!important} p {color:green!important}`, "green"},
+	} {
+		got := specificityColors(t, `<p id="x">text</p>`, tc.sheet)
+		if got["x"] != tc.want {
+			t.Errorf("%s: got %s", tc.sheet, got["x"])
+		}
+	}
+}

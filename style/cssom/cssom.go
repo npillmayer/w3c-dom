@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/andybalholm/cascadia"
+	"github.com/gorilla/css/scanner"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tree"
 	"github.com/npillmayer/w3c-dom/style"
@@ -43,8 +44,10 @@ func NewCSSOM(additionalProperties []style.KeyValue) CSSOM {
 
 // AddStylesForScope includes a stylesheet to a CSSOM and sets the scope for
 // the stylesheet. If a stylesheet for the scope already exists, the
-// styles are merged. css may be nil. If scope is nil then scope is the
-// root (i.e., top-level content element) of a future document.
+// styles are merged. A nonnil scope applies to that element and its descendants.
+// A nil scope applies to the entire document. At equal importance and specificity,
+// sheets are ordered globally, then from outer to inner scope; registration order
+// is retained within each scope. Inline declarations apply only to their own node.
 //
 // The stylsheet may not be nil.
 // source hints to where the stylesheet comes from.
@@ -156,9 +159,11 @@ func (rt *rulesTreeType) Empty() bool {
 // allowed to extend the set of compound properties.
 type CompoundPropertiesSplitter func(string, style.Property) ([]style.KeyValue, error)
 
-// RegisterCompoundSplitter allows clients to handle additional compound
-// properties. See type CompoundPropertiesSplitter.
-func (cssom CSSOM) RegisterCompoundSplitter(splitter CompoundPropertiesSplitter) {
+// RegisterCompoundSplitter appends a splitter to this CSSOM. Nil splitters are
+// ignored. During styling, built-in splitters run first, then registered splitters
+// in registration order until one succeeds. Register before calling Style;
+// registration is not synchronized with styling.
+func (cssom *CSSOM) RegisterCompoundSplitter(splitter CompoundPropertiesSplitter) {
 	if splitter != nil {
 		cssom.compoundSplitters = append(cssom.compoundSplitters, splitter)
 	}
@@ -261,8 +266,11 @@ func (matches *matchesList) String() string {
 // Will return a slice of CSS rules matched for h.
 func (rt *rulesTreeType) FilterMatchesFor(h *html.Node) *matchesList {
 	matchingRules := make([]matchedRule, 0, 3)
-	collect := func(sheets []stylesheetType) {
+	collect := func(sheets []stylesheetType, local bool) {
 		for _, sheet := range sheets {
+			if _, inline := sheet.stylesheet.(*localPseudoStylesheetType); inline && !local {
+				continue
+			}
 			for _, rule := range sheet.stylesheet.Rules() {
 				if spec, ok := rt.matchRuleForHTMLNode(h, rule); ok {
 					matchingRules = append(matchingRules, matchedRule{rule: rule, spec: spec})
@@ -272,8 +280,14 @@ func (rt *rulesTreeType) FilterMatchesFor(h *html.Node) *matchesList {
 	}
 	// Slice order retains registration/rule order across sheets. The matched
 	// rule index is a separate tie breaker, never part of selector specificity.
-	collect(rt.StylesheetsForHTMLNode(rootElement))
-	collect(rt.StylesheetsForHTMLNode(h))
+	collect(rt.StylesheetsForHTMLNode(rootElement), false)
+	var scopes []*html.Node
+	for node := h; node != nil; node = node.Parent {
+		scopes = append(scopes, node)
+	}
+	for i := len(scopes) - 1; i >= 0; i-- {
+		collect(rt.StylesheetsForHTMLNode(scopes[i]), scopes[i] == h)
+	}
 	return &matchesList{matchingRules: matchingRules}
 }
 
@@ -315,7 +329,7 @@ func (rt *rulesTreeType) matchRuleForHTMLNode(h *html.Node, rule Rule) (cascadia
 // Finally all property entries are sorted by specifity of the enclosing rule.
 func (matches *matchesList) SortProperties(splitters []CompoundPropertiesSplitter) {
 	var proptable []propertyPlusSpecifityType
-	for rno, match := range matches.matchingRules {
+	for _, match := range matches.matchingRules {
 		rule := match.rule
 		for _, propertyKey := range rule.Properties() {
 			value := style.Property(rule.Value(propertyKey))
@@ -327,14 +341,14 @@ func (matches *matchesList) SortProperties(splitters []CompoundPropertiesSplitte
 					val := kv.Value
 					sp := propertyPlusSpecifityType{
 						source: Author, rule: rule, propertyKey: key, propertyValue: val,
-						important: rule.IsImportant(propertyKey), spec: match.spec, sourceOrder: rno,
+						important: rule.IsImportant(propertyKey), spec: match.spec, sourceOrder: len(proptable),
 					}
 					proptable = append(proptable, sp)
 				}
 			} else {
 				sp := propertyPlusSpecifityType{
 					source: Author, rule: rule, propertyKey: propertyKey, propertyValue: value,
-					important: rule.IsImportant(propertyKey), spec: match.spec, sourceOrder: rno,
+					important: rule.IsImportant(propertyKey), spec: match.spec, sourceOrder: len(proptable),
 				}
 				proptable = append(proptable, sp)
 			}
@@ -368,6 +382,7 @@ func (matches *matchesList) createStyleGroups(parent *tree.Node[*styledtree.StyN
 	pmap := style.NewPropertyMap()
 	done := make(map[string]bool, len(matches.propertiesTable))
 	for _, pspec := range matches.propertiesTable { // for every specifity entry
+		pspec.propertyKey = style.CanonicalPropertyKey(pspec.propertyKey)
 		if done[pspec.propertyKey] {
 			// already present in current properties map
 			// this must be from previous set with higher specifity
@@ -683,25 +698,100 @@ type localPseudoStylesheetType struct {
 	rule localPseudoRuleType
 }
 
-type localPseudoRuleType []style.KeyValue
+type localDeclaration struct {
+	style.KeyValue
+	important bool
+}
+type localPseudoRuleType []localDeclaration
 
+// Tokenize before splitting so strings, URLs and function arguments retain delimiters.
 func newLocalPseudoRule(styleAttr string) localPseudoRuleType {
-	styles := strings.Split(styleAttr, ";")
-	kv := make(localPseudoRuleType, 0, 3)
-	for _, st := range styles {
-		st = strings.TrimSpace(st)
-		if len(st) > 0 {
-			s := strings.Split(st, ":")
-			if len(s) < 2 {
-				tracer().Errorf("Skipping ill-formed style rule: %s", st)
-			} else {
-				k := strings.TrimSpace(s[0])
-				v := strings.TrimSpace(s[1])
-				kv = append(kv, style.KeyValue{Key: k, Value: style.Property(v)})
+	var result localPseudoRuleType
+	var tokens []*scanner.Token
+	depth := 0
+	flush := func() {
+		defer func() { tokens = nil }()
+		significant := make([]*scanner.Token, 0, len(tokens))
+		for _, token := range tokens {
+			if token.Type != scanner.TokenS && token.Type != scanner.TokenComment {
+				significant = append(significant, token)
 			}
 		}
+		if len(significant) < 3 || significant[0].Type != scanner.TokenIdent || significant[1].Value != ":" {
+			return
+		}
+		key := significant[0].Value
+		if !strings.HasPrefix(key, "--") {
+			key = style.CanonicalPropertyKey(strings.ToLower(key))
+		}
+		important := false
+		end := len(tokens)
+		if len(significant) >= 4 && significant[len(significant)-1].Type == scanner.TokenIdent && strings.EqualFold(significant[len(significant)-1].Value, "important") && significant[len(significant)-2].Value == "!" {
+			important = true
+			for i, t := range tokens {
+				if t == significant[len(significant)-2] {
+					end = i
+					break
+				}
+			}
+		}
+		var value strings.Builder
+		started := false
+		for _, t := range tokens[:end] {
+			if !started {
+				if t == significant[1] {
+					started = true
+				}
+				continue
+			}
+			if t.Type == scanner.TokenComment {
+				value.WriteByte(' ')
+			} else {
+				value.WriteString(t.Value)
+			}
+		}
+		v := strings.TrimSpace(value.String())
+		if v == "" {
+			return
+		}
+		for i, d := range result {
+			if d.Key == key {
+				if d.important && !important {
+					return
+				}
+				result = append(result[:i], result[i+1:]...)
+				break
+			}
+		}
+		result = append(result, localDeclaration{style.KeyValue{Key: key, Value: style.Property(v)}, important})
 	}
-	return kv
+	lexer := scanner.New(styleAttr)
+	for {
+		token := lexer.Next()
+		if token.Type == scanner.TokenError {
+			break
+		}
+		if token.Type == scanner.TokenEOF {
+			if depth == 0 {
+				flush()
+			}
+			break
+		}
+		if token.Type == scanner.TokenChar && token.Value == ";" && depth == 0 {
+			flush()
+			continue
+		}
+		if token.Type == scanner.TokenFunction || (token.Type == scanner.TokenChar && (token.Value == "(" || token.Value == "[" || token.Value == "{")) {
+			depth++
+		}
+		if token.Type == scanner.TokenChar && (token.Value == ")" || token.Value == "]" || token.Value == "}") {
+			if depth > 0 {
+				depth--
+			}
+		}
+		tokens = append(tokens, token)
+	}
+	return result
 }
 
 func (pseudorule localPseudoRuleType) Selector() string {
@@ -716,6 +806,7 @@ func (pseudorule localPseudoRuleType) Properties() []string {
 	return p
 }
 func (pseudorule localPseudoRuleType) Value(key string) style.Property {
+	key = style.CanonicalPropertyKey(key)
 	for _, kv := range pseudorule {
 		if key == kv.Key {
 			return kv.Value
@@ -724,17 +815,23 @@ func (pseudorule localPseudoRuleType) Value(key string) style.Property {
 	return style.NullStyle
 }
 
-func (pseudorule localPseudoRuleType) IsImportant(string) bool {
+func (pseudorule localPseudoRuleType) IsImportant(key string) bool {
+	key = style.CanonicalPropertyKey(key)
+	for _, d := range pseudorule {
+		if d.Key == key {
+			return d.important
+		}
+	}
 	return false
 }
 
 func (pseudosheet *localPseudoStylesheetType) AppendRules(s StyleSheet) {
 	for _, r := range s.Rules() {
 		for _, k := range r.Properties() {
-			pseudosheet.rule = append(pseudosheet.rule, style.KeyValue{
+			pseudosheet.rule = append(pseudosheet.rule, localDeclaration{KeyValue: style.KeyValue{
 				Key:   k,
 				Value: r.Value(k),
-			})
+			}, important: r.IsImportant(k)})
 		}
 	}
 }

@@ -23,3 +23,20 @@ func TestInlinePriorityAndIndependentProperties(t *testing.T) {
 		t.Fatalf("size lost: %q", value)
 	}
 }
+
+func TestInlineShorthandOrderAndValueCase(t *testing.T) {
+	for _, tc := range []struct{ input, key, want string }{
+		{`margin:1px;margin-left:2px`, "margin-left", "2px"},
+		{`margin-left:2px;margin:1px`, "margin-left", "1px"},
+		{`margin:1px!important;margin-left:2px`, "margin-left", "1px"},
+		{`content:"Hello;World"`, "content", `"Hello;World"`},
+	} {
+		list := matchesList{matchingRules: []matchedRule{{rule: newLocalPseudoRule(tc.input)}}}
+		list.SortProperties([]CompoundPropertiesSplitter{style.SplitCompoundProperty})
+		root := setupStyledNodeTree(&html.Node{Type: html.DocumentNode}, NewCSSOM(nil).defaultProperties)
+		props := list.createStyleGroups(root.Parent())
+		if got, _ := props.Property(tc.key); string(got) != tc.want {
+			t.Errorf("%s = %q", tc.input, got)
+		}
+	}
+}

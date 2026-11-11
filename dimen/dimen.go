@@ -14,8 +14,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"regexp"
-	"strconv"
+	"strings"
 )
 
 // Online dimension conversion for print:
@@ -97,10 +98,12 @@ func (r Rect) Height() DU {
 
 // ---------------------------------------------------------------------------
 
-var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[cminpxtc]{2})?$`)
+var dimenPattern = regexp.MustCompile(`^([+\-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+))(%|[a-zA-Z]{2})?$`)
 
 // ParsePercent parses a string to return a dimension. Syntax is CSS Unit.
 // If a percentage value is given (`80%`), the second return value will be true.
+// Decimal results round half away from zero to DU (whole percent for percentages).
+// Values outside int32 before rounding return an error.
 func ParsePercent(s string) (DU, bool, error) {
 	d := dimenPattern.FindStringSubmatch(s)
 	if len(d) < 2 {
@@ -109,7 +112,7 @@ func ParsePercent(s string) (DU, bool, error) {
 	scale := SP
 	ispcnt := false
 	if len(d) > 2 {
-		switch d[2] {
+		switch strings.ToLower(d[2]) {
 		case "pt", "PT":
 			scale = PT
 		case "mm", "MM":
@@ -128,11 +131,11 @@ func ParsePercent(s string) (DU, bool, error) {
 			return 0, false, errors.New("format error parsing dimension")
 		}
 	}
-	n, err := strconv.Atoi(d[1])
+	value, err := ParseScaled(d[1], scale)
 	if err != nil {
-		return 0, false, errors.New("format error parsing dimension")
+		return 0, false, err
 	}
-	return DU(n) * scale, ispcnt, nil
+	return value, ispcnt, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -151,4 +154,25 @@ func Max(a, b DU) DU {
 		return a
 	}
 	return b
+}
+
+// ParseScaled converts a decimal magnitude to design units, rounding half away
+// from zero. Values outside the int32 range before rounding are rejected.
+func ParseScaled(number string, scale DU) (DU, error) {
+	if !regexp.MustCompile(`^[+\-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$`).MatchString(number) {
+		return 0, fmt.Errorf("invalid dimension magnitude %q", number)
+	}
+	value, ok := new(big.Rat).SetString(number)
+	if !ok {
+		return 0, fmt.Errorf("invalid dimension magnitude %q", number)
+	}
+	value.Mul(value, new(big.Rat).SetInt64(int64(scale)))
+	if value.Cmp(new(big.Rat).SetInt64(math.MinInt32)) < 0 || value.Cmp(new(big.Rat).SetInt64(math.MaxInt32)) > 0 {
+		return 0, fmt.Errorf("dimension overflow: %s", number)
+	}
+	sign := value.Sign()
+	value.Abs(value)
+	value.Add(value, big.NewRat(1, 2))
+	rounded := new(big.Int).Quo(value.Num(), value.Denom()).Int64()
+	return DU(int64(sign) * rounded), nil
 }

@@ -1,5 +1,15 @@
 
-TODOs:
+# w3c-dom
+
+Experimental HTML DOM and CSS styling utilities for a typesetting pipeline.
+
+See the [module inventory](doc/README.md) for architecture, current quality,
+confirmed accessor failures, and repair priorities (reviewed 2026-11-10).
+
+## Historical TODO list
+
+The entries below are retained for reference. Their line numbers and priorities
+are not maintained; see the [TODO reconciliation](doc/todo.md) for current status.
 
   - `dom.go:302` — include pseudo-elements in computed styles.
   - `dimen/dimen.go:66` — see methods in image.Point.

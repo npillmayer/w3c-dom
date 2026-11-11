@@ -1,7 +1,6 @@
 package css
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/npillmayer/w3c-dom/style"
@@ -14,48 +13,28 @@ import (
 // Clients will usually call GetProperty(…) instead as this will respect
 // CSS semantics for inherited properties.
 //
-// The call to GetCascadedProperty will flag an error if the style property
-// isn't found (which should not happen, as every property should be included
-// in the 'user-agent' default style properties).
+// GetCascadedProperty returns NullStyle and an error if node is nil or no
+// nonempty value is found in the node, its property groups, or its ancestors.
 func GetCascadedProperty(node *styledtree.StyNode, key string) (style.Property, error) {
-	// key has to be found in a property group of type G.
-	// For cascading, we will start at the currenty style-tree node and walk
-	// upwards until we find a node with a property-group G attached.
-	// This upward-traversal must succeed if the property is correctly initialized
-	// at least in the user-agent styles.
-	// Then, starting with G, we will upward-cascade until key is found.
 	groupname := style.GroupNameFromPropertyKey(key)
-	var group *style.PropertyGroup
-	for node != nil && group == nil {
-		group = node.Styles().Group(groupname)
-		node = node.Parent().Payload
+	for node != nil {
+		if group := node.Styles().Group(groupname).Cascade(key); group != nil {
+			p, _ := group.Get(key)
+			return p, nil
+		}
+		node = styledtree.Node(node.Parent())
 	}
-	if group == nil {
-		errmsg := fmt.Sprintf("Cannot find ancestor with prop-group %s -- did you create global properties?", groupname)
-		return style.NullStyle, errors.New(errmsg)
-	}
-	p, _ := group.Cascade(key).Get(key)
-	return p, nil // must succeed
+	return style.NullStyle, fmt.Errorf("no cascaded value for property %q", key)
 }
 
-// GetProperty gets the value of a property. If the property is not set
-// locally on the style node and the property is inheritable, he search
-// cascades to parent property maps, if available.
-//
-// The call to GetProperty will flag an error if the style property isn't found
-// (which should not happen, as every property should be included in the
-// 'user-agent' default style properties).
+// GetProperty resolves inheritance, explicit inherit/initial/unset, and defaults.
+// Unknown absent properties return NullStyle; nil nodes return an error.
+// Relative lengths and other layout-dependent values are not computed here.
 func GetProperty(node *styledtree.StyNode, key string) (style.Property, error) {
-	if style.IsCascading(key) {
-		return GetCascadedProperty(node, key)
+	if node == nil {
+		return style.NullStyle, fmt.Errorf("cannot get property %q from a nil node", key)
 	}
-	//T().Debugf("css get property: %s is not inherited", key)
-	p := GetLocalProperty(node.Styles(), key)
-	if p == style.NullStyle {
-		p = style.GetUserAgentDefaultProperty(node.HTMLNode(), key)
-	}
-	//T().Debugf("css get property: local property value = %+v", p)
-	return p, nil
+	return node.GetPropertyValue(key, node.Styles()), nil
 }
 
 // GetLocalProperty returns a style property value, if it is set locally

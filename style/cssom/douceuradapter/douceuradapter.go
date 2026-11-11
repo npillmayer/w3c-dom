@@ -1,7 +1,7 @@
 /*
 Package douceuradapter is a concrete implementation of interface cssom.StyleSheet.
 
-License
+# License
 
 Governed by a 3-Clause BSD license. License file may be found in the root
 folder of this module.
@@ -17,6 +17,7 @@ import (
 	"github.com/npillmayer/w3c-dom/style/cssom"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+	"strings"
 )
 
 // CSSStyles is an adapter for interface cssom.StyleSheet.
@@ -72,44 +73,61 @@ func (r Rule) Selector() string {
 	return r.Prelude
 }
 
-// Properties returns the property keys of a rule,
-// e.g. "margin-top"
+// declarationKey normalizes standard property names without changing custom names.
+func declarationKey(key string) string {
+	if strings.HasPrefix(key, "--") {
+		return key
+	}
+	return style.CanonicalPropertyKey(strings.ToLower(key))
+}
+
+// winningDeclarations retains the last declaration at equal importance.
+// Indices preserve the winners' original positions for shorthand/longhand ties.
+func (r Rule) winningDeclarations() map[string]int {
+	winners := make(map[string]int)
+	for i, d := range r.Declarations {
+		key := declarationKey(d.Property)
+		previous, exists := winners[key]
+		if !exists || !r.Declarations[previous].Important || d.Important {
+			winners[key] = i
+		}
+	}
+	return winners
+}
+
+// Properties returns each winning property once, in declaration source order.
 func (r Rule) Properties() []string {
-	decl := r.Declarations
-	props := make([]string, 0, len(decl))
-	for _, d := range decl {
-		props = append(props, d.Property)
+	winners := r.winningDeclarations()
+	props := make([]string, 0, len(winners))
+	for i, d := range r.Declarations {
+		key := declarationKey(d.Property)
+		if winners[key] == i {
+			props = append(props, key)
+		}
 	}
 	return props
 }
 
-// Value returns the property values for given key with this rule, e.g. "15px"
+// Value returns the winning declaration value, or NullStyle if absent.
 func (r Rule) Value(key string) style.Property {
-	decl := r.Declarations
-	for _, d := range decl {
-		if d.Property == key {
-			return style.Property(d.Value)
-		}
+	if i, ok := r.winningDeclarations()[declarationKey(key)]; ok {
+		return style.Property(r.Declarations[i].Value)
 	}
-	return ""
+	return style.NullStyle
 }
 
-// IsImportant returns true if a style key is marked as important ("!").
+// IsImportant reports the importance of the winning declaration.
 func (r Rule) IsImportant(key string) bool {
-	decl := r.Declarations
-	for _, d := range decl {
-		if d.Property == key {
-			return d.Important
-		}
-	}
-	return false
+	i, ok := r.winningDeclarations()[declarationKey(key)]
+	return ok && r.Declarations[i].Important
 }
 
 var _ cssom.Rule = &Rule{}
 
 // ExtractStyleElements visits <head> and <body> elements in an HTML parse
 // tree and searches for embedded <style>s. It returns the content of
-// style-elements as style sheets.
+// style-elements as style sheets. Nil input and missing head/body elements are
+// allowed. Empty style elements without content are skipped.
 func ExtractStyleElements(htmldoc *html.Node) []*CSSStyles {
 	head := findElement(atom.Head, htmldoc)
 	body := findElement(atom.Body, htmldoc)
@@ -123,9 +141,12 @@ func ExtractStyleElements(htmldoc *html.Node) []*CSSStyles {
 
 func extractStyles(h *html.Node) []*CSSStyles {
 	var css []*CSSStyles
+	if h == nil {
+		return css
+	}
 	ch := h.FirstChild
 	for ch != nil {
-		if ch.DataAtom == atom.Style {
+		if ch.DataAtom == atom.Style && ch.FirstChild != nil {
 			c, err := parser.Parse(ch.FirstChild.Data)
 			if err != nil {
 				break

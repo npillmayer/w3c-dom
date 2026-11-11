@@ -185,7 +185,7 @@ func (w *W3CNode) ChildNodes() w3cdom.NodeList {
 }
 
 // Children is a read-only property that returns a node list which contains all of
-// the child *elements* of the node upon which it was called
+// the child elements in tree order. The returned list is a snapshot.
 func (w *W3CNode) Children() w3cdom.NodeList {
 	if w == nil {
 		return nil
@@ -193,13 +193,11 @@ func (w *W3CNode) Children() w3cdom.NodeList {
 	tn, ok := TreeNodeFromNode(w)
 	if ok {
 		children := tn.Children(true)
-		childnodes := make([]*W3CNode, len(children))
-		j := 0
+		childnodes := make([]*W3CNode, 0, len(children))
 		for _, ch := range children {
 			sn := styledtree.Node(ch)
 			if sn.HTMLNode().Type == html.ElementNode {
-				childnodes[j] = &W3CNode{sn}
-				j++
+				childnodes = append(childnodes, &W3CNode{sn})
 			}
 		}
 		return &W3CNodeList{childnodes}
@@ -339,15 +337,13 @@ func styler(n *tree.Node[*styledtree.StyNode]) style.Styler {
 // GetPropertyValue returns the property value for a given key.
 // If cstyles is nil or the property could not be found, NullStyle is returned.
 func (cstyles *computedStyles) GetPropertyValue(key string) style.Property {
-	if cstyles == nil {
+	if cstyles == nil || cstyles.domnode == nil || cstyles.domnode.StyNode == nil {
 		return style.NullStyle
 	}
-	//p, err := css.GetProperty(cstyles.domnode.AsStyler(), key)
 	p, err := css.GetProperty(cstyles.domnode.StyNode, key)
 	if err != nil {
 		tracer().Errorf("W3C node styles: %v", err)
-		//return cstyles.propsMap.GetPropertyValue(key, node, styler)
-		return cstyles.domnode.StyNode.GetPropertyValue(key, cstyles.propsMap)
+		return style.NullStyle
 	}
 	return p
 }
@@ -463,7 +459,7 @@ func nodeMapFor(sn *styledtree.StyNode) w3cdom.NamedNodeMap {
 
 // Length returns the number of entries in a key-value map
 func (wm *W3CMap) Length() int {
-	if wm == nil {
+	if wm == nil || wm.forNode == nil {
 		return 0
 	}
 	return len(wm.forNode.HTMLNode().Attr)
@@ -471,7 +467,7 @@ func (wm *W3CMap) Length() int {
 
 // Item returns the i.th item in a key-value map
 func (wm *W3CMap) Item(i int) w3cdom.Attr {
-	if wm == nil {
+	if wm == nil || wm.forNode == nil {
 		return nil
 	}
 	attrs := wm.forNode.HTMLNode().Attr
@@ -483,7 +479,7 @@ func (wm *W3CMap) Item(i int) w3cdom.Attr {
 
 // GetNamedItem returns the attribute with key key.
 func (wm *W3CMap) GetNamedItem(key string) w3cdom.Attr {
-	if wm == nil {
+	if wm == nil || wm.forNode == nil {
 		return nil
 	}
 	attrs := wm.forNode.HTMLNode().Attr

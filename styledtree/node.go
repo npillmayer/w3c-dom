@@ -65,32 +65,60 @@ func (sn *StyNode) SetStyles(styles *style.PropertyMap) {
 	sn.computedStyles = styles
 }
 
-// GetPropertyValue returns the property value for a given key.
-// If the property is inherited, it may cascade.
-// func (pmap *style.PropertyMap) GetPropertyValue(key string, node *tree.Node[*styledtree.StyNode]) style.Property {
+// GetPropertyValue resolves a local declaration, inheritance and UA defaults.
+// pmap supplies the local declarations; nil means no local declarations.
+// Explicit initial bypasses UA overrides. Unknown absent properties return NullStyle.
 func (sn *StyNode) GetPropertyValue(key string, pmap *style.PropertyMap) style.Property {
-	p, ok := pmap.Property(key)
-	if ok {
-		if p != "inherit" {
-			return p
+	if sn == nil {
+		return style.NullStyle
+	}
+	initial := style.InitialProperty(key)
+	var defaults *style.PropertyMap
+	for n := sn; n != nil; n = Node(n.Parent()) {
+		if n.Styles().IsDefaults() {
+			defaults = n.Styles()
+			break
 		}
 	}
-	// not found in local dicts => cascade, if allowed
-	if p == "inherit" || style.IsCascading(key) {
-		groupname := style.GroupNameFromPropertyKey(key)
-		tracer().P("key", key).Debugf("styling: cascading for key %s", key)
-		tracer().P("key", key).Debugf("styling: cascading with property group %s", groupname)
-		var group *style.PropertyGroup
-		for sn != nil && group == nil {
-			sn = sn.Parent().Payload
+	ua := func(n *StyNode) style.Property {
+		v := defaults.DefaultProperty(n.HTMLNode(), key)
+		switch strings.ToLower(strings.TrimSpace(string(v))) {
+		case "inherit", "initial", "unset":
+			return initial
 		}
-		if group == nil {
-			return style.NullStyle
-		}
-		p, _ := group.Cascade(key).Get(key)
-		return p
+		return v
 	}
-	return style.NullStyle
+	var resolve func(*StyNode, *style.PropertyMap) style.Property
+	resolve = func(n *StyNode, local *style.PropertyMap) style.Property {
+		if n == nil || local.IsDefaults() {
+			return initial
+		}
+		value, _ := local.Property(key)
+		keyword := strings.ToLower(strings.TrimSpace(string(value)))
+		if keyword == "initial" || (keyword == "unset" && !style.IsCascading(key)) {
+			return initial
+		}
+		inherit := keyword == "inherit" || keyword == "unset" || (value.IsEmpty() && style.IsCascading(key))
+		if inherit {
+			parent := Node(n.Parent())
+			// Document and synthetic root are bookkeeping, not CSS parent elements.
+			if parent != nil && parent.HTMLNode().Type == html.ElementNode && !parent.Styles().IsDefaults() {
+				return resolve(parent, parent.Styles())
+			}
+			if keyword == "inherit" || keyword == "unset" {
+				return initial
+			}
+			return ua(n)
+		}
+		if !value.IsEmpty() {
+			return value
+		}
+		return ua(n)
+	}
+	if pmap.IsDefaults() {
+		return ua(sn)
+	}
+	return resolve(sn, pmap)
 }
 
 // --- Helpers ---------------------------------------------------------------

@@ -40,9 +40,10 @@ const (
 
 // DimenT is an option type for CSS dimensions.
 type DimenT struct {
-	d       dimen.DU
-	percent Percent
-	flags   uint32
+	relative float64
+	d        dimen.DU
+	percent  Percent
+	flags    uint32
 }
 
 /*
@@ -114,16 +115,19 @@ type DMatcher struct {
 	dimen DimenT
 }
 
+// IsKind matches scalar variants exactly. Non-percentage relative units share
+// a kind, as do content-dependent dimensions; percentages are a separate kind.
 func (m *DMatcher) IsKind(d DimenT) *DMatcher {
-	switch {
-	case (m.dimen.flags & kindMask) == (d.flags & kindMask):
+	if m == nil {
+		return nil
+	}
+	if m.dimen.flags == d.flags {
 		return m
-	case (m.dimen.flags&relativeMask > 0) && (d.flags&relativeMask > 0):
-		if (m.dimen.flags&dimenPercent > 0) != (d.flags&dimenPercent > 0) {
-			return nil
-		}
+	}
+	if m.dimen.IsRelative() && d.IsRelative() && m.dimen.IsPercent() == d.IsPercent() {
 		return m
-	case (m.dimen.flags&contentMask > 0) && (d.flags&contentMask > 0):
+	}
+	if m.dimen.flags&contentMask != 0 && d.flags&contentMask != 0 {
 		return m
 	}
 	return nil
@@ -137,7 +141,7 @@ func (m *DMatcher) Unset() *DMatcher {
 }
 
 func (m *DMatcher) Just(du *dimen.DU) *DMatcher {
-	if m.dimen.flags&dimenAbsolute > 0 {
+	if m != nil && m.dimen.IsAbsolute() {
 		if du != nil {
 			*du = m.dimen.d
 		}
@@ -147,7 +151,7 @@ func (m *DMatcher) Just(du *dimen.DU) *DMatcher {
 }
 
 func (m *DMatcher) Percentage(p *Percent) *DMatcher {
-	if m.dimen.flags&dimenPercent > 0 {
+	if m != nil && m.dimen.IsPercent() {
 		if p != nil {
 			*p = m.dimen.percent
 		}
@@ -180,13 +184,13 @@ func (m *DMatchExpr[T]) OneOf(patterns DimenPatterns[T]) T {
 	switch {
 	case m.dimen.flags == dimenUnset:
 		return patterns.Unset
-	case m.dimen.flags&dimenAuto > 0:
+	case m.dimen.flags == dimenAuto:
 		return patterns.Auto
-	case m.dimen.flags&dimenAbsolute > 0:
+	case m.dimen.flags == dimenAbsolute:
 		return patterns.Just
-	case m.dimen.flags&dimenInitial > 0:
+	case m.dimen.flags == dimenInitial:
 		return patterns.Initial
-	case m.dimen.flags&dimenInherit > 0:
+	case m.dimen.flags == dimenInherit:
 		return patterns.Inherit
 	}
 	return patterns.Default
@@ -215,7 +219,7 @@ func (d DimenT) IsRelative() bool {
 
 // IsPercent returns true if d represents a percentage dimension (`%`).
 func (d DimenT) IsPercent() bool {
-	return d.flags&dimenPercent > 0
+	return d.flags&relativeMask == dimenPercent
 }
 
 // IsAbsolute returns true if d represents a valid absolute dimension.
@@ -225,9 +229,10 @@ func (d DimenT) IsAbsolute() bool {
 
 // ---------------------------------------------------------------------------
 
-var dimenPattern = regexp.MustCompile(`^([+\-]?[0-9]+)(%|[a-zA-Z]{2,4})?$`)
+var dimenPattern = regexp.MustCompile(`^([+\-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+))(%|[a-zA-Z]{2,4})?$`)
 
-// ParseDimen parses a string to return an optional dimension. Syntax is CSS Unit.
+// ParseDimen parses a signed integer or decimal dimension. Percentages use PercentFromFloat
+// and are clamped to [0, 100], matching this package's bounded Percent helpers.
 // Valid dimensions are
 //
 //	15px
@@ -253,7 +258,7 @@ func ParseDimen(s string) (DimenT, error) {
 	scale := dimen.SP
 	dim := JustDimen(0)
 	if len(d) > 2 {
-		switch d[2] {
+		switch strings.ToLower(d[2]) {
 		case "pt", "PT":
 			scale = dimen.PT
 		case "mm", "MM":
@@ -276,11 +281,28 @@ func ParseDimen(s string) (DimenT, error) {
 			}
 		}
 	}
-	n, err := strconv.Atoi(d[1])
-	if err != nil { // this cannot happen
-		return DimenT{}, errors.New("format error parsing dimension")
+	n, err := strconv.ParseFloat(d[1], 64)
+	if err != nil || math.IsInf(n, 0) || math.IsNaN(n) {
+		return DimenT{}, errors.New("invalid dimension magnitude")
 	}
-	dim.d = dimen.DU(n) * scale
+	if dim.IsPercent() {
+		if _, err := dimen.ParseScaled(d[1], 1); err != nil {
+			return DimenT{}, err
+		}
+		return Percentage(PercentFromFloat(n)), nil
+	}
+	if dim.IsRelative() {
+		dim.relative = n
+		dim.d, err = dimen.ParseScaled(d[1], 1)
+		if err != nil {
+			return DimenT{}, err
+		}
+		return dim, nil
+	}
+	dim.d, err = dimen.ParseScaled(d[1], scale)
+	if err != nil {
+		return DimenT{}, err
+	}
 	return dim, nil
 }
 
@@ -342,13 +364,23 @@ func PercentFromFloat(f float64) Percent {
 	return Percent(math.Round(f))
 }
 
+// PercentFromString parses an integer percentage, clamping to [0, 100].
 func PercentFromString(s string) (Percent, error) {
 	s = strings.TrimSpace(s)
 	s = strings.TrimSuffix(s, "%")
 	n, err := strconv.Atoi(s)
-	return Percent(n), err
+	if err != nil {
+		return 0, err
+	}
+	return PercentFromInt(n), nil
 }
 
 func (p Percent) String() string {
 	return strconv.Itoa(int(p)) + "%"
+}
+
+// RelativeValue returns the magnitude of a font/viewport-relative dimension.
+// UnitString identifies its unit. Percentages use Match().Percentage instead.
+func (d DimenT) RelativeValue() (float64, bool) {
+	return d.relative, d.IsRelative() && !d.IsPercent()
 }
