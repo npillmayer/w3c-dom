@@ -1,6 +1,9 @@
 package style
 
-import "golang.org/x/net/html"
+import (
+	"golang.org/x/net/html"
+	"strings"
+)
 
 // propertyMetadata is the single registry for the supported property subset.
 // "default" remains a renderer sentinel for colors; this is not a full CSS registry.
@@ -98,21 +101,42 @@ func DisplayPropertyForHTMLNode(node *html.Node) Property {
 		tracer().Debugf("cannot get display-property for non-element")
 		return "none"
 	}
-	switch node.Data {
-	case "head":
+	// HTML element names are ASCII case-insensitive. Unknown/custom elements
+	// use CSS's initial inline display rather than an invented block default.
+	switch strings.ToLower(node.Data) {
+	case "head", "title", "base", "link", "meta", "style", "script", "template":
 		return "none"
 	case "p":
-		return "block-inline"
-	case "html", "aside", "body", "div", "h1", "h2", "h3",
-		"h4", "h5", "h6", "it", "ol", "section",
-		"ul":
+		return "block-inline" // retained paragraph formatting convention
+	case "html", "body", "address", "article", "aside", "blockquote", "div",
+		"figcaption", "figure", "footer", "form", "header", "hr", "main", "nav",
+		"h1", "h2", "h3", "h4", "h5", "h6", "ol", "ul", "menu", "pre", "section",
+		"dl", "dt", "dd", "fieldset", "details":
 		return "block"
-	case "i", "b", "span", "strong":
-		return "inline"
+	case "li", "summary":
+		return "list-item"
+	case "button", "input", "select", "textarea":
+		return "inline-block"
+	case "table":
+		return "table"
+	case "caption":
+		return "table-caption"
+	case "tr":
+		return "table-row"
+	case "td", "th":
+		return "table-cell"
+	case "thead":
+		return "table-header-group"
+	case "tbody":
+		return "table-row-group"
+	case "tfoot":
+		return "table-footer-group"
+	case "col":
+		return "table-column"
+	case "colgroup":
+		return "table-column-group"
 	}
-	tracer().Infof("unknown HTML element %s/%d will be set to display: block",
-		node.Data, node.Type)
-	return "block"
+	return "inline"
 }
 
 // InitializeDefaultPropertyValues builds defaults from the property registry.

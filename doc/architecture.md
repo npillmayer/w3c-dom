@@ -166,3 +166,11 @@ This intentionally changes existing px/pt results and border-width keyword sizes
 expressed through PX. Downstream TeX conversions must be defined downstream.
 `bp`, `sp`, and unitless-as-sp remain compatibility extensions. Parent/root-relative
 length computation and viewport/font metrics are still downstream responsibilities.
+
+HTML tag defaults now use inline fallback with explicit block/list/table/control
+and non-rendered exceptions. The paragraph block-inline convention remains.
+This table is separate from the styling allowlist and layout capabilities; table-part values now have typed ParseDisplay roles but do not imply table layout
+support.
+
+DisplayMode uses uint32 to represent distinct table-part flags. Inner retains those
+roles; table/inline-table retain their existing container and outer flags.

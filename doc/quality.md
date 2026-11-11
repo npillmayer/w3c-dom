@@ -187,7 +187,8 @@ percentages remain outside the bounded Percent model.
   color()/lab()/lch()/oklab()/oklch(), calc(), none components and CSS escapes/comments
   in color expressions remain unsupported. Tests cover alpha, standard green,
   formats, clamping, invalid input and serialization round trips.
-- **Display:** display parsing still supports fewer modes than its flags represent.
+- **Display:** table-part parsing is now supported; flex/grid and other broader
+  display syntax remain outside the current parser.
 - **Errors and adapters:** `FromHTMLParseTree` logs construction errors and returns nil;
   `FromHTMLParseTreeWithError` propagates extraction/styling errors. Recursive
   extraction now reports errors and continues collecting valid sheets. `CSSStyles.AppendRules`
@@ -289,3 +290,37 @@ Exact rational mm/cm scaling avoids compounding rounded per-unit constants.
 units, fractional/case variants, compatibility units, and updated overflow limits
 in both parsers. Fixed-point rounding and overflow policy are unchanged.
 The downstream absolute-unit mismatch is resolved; relative-size resolution is not.
+
+## Downstream HTML display follow-up (2026-11-11)
+
+`DisplayPropertyForHTMLNode` now uses inline as the fallback, fixing links,
+emphasis, code, labels, quotes, superscripts, images, and other supported inline
+content. Explicit defaults cover block containers, list items, common controls,
+table parts, and non-rendered metadata. The existing paragraph `block-inline`
+convention and document/text/nil behavior are retained. HTML names are matched
+case-insensitively. Unknown/custom elements now default to inline rather than block.
+
+`style/display_defaults_test.go` covers tag classifications;
+`style/css/html_display_test.go` checks styled-tree/DOM lookup and explicit block,
+inherit, initial, and unset declarations. Defaults do not expand the styling
+allowlist or add layout implementations. Table-part strings now have distinct typed ParseDisplay modes. Attribute/context-specific
+widget behavior, hidden attributes, namespace-specific rules, and full browser UA
+stylesheets remain outside this tag-based approximation. Downstream supported-tag
+checks should not be removed solely because these defaults exist.
+
+Reference: [HTML rendering defaults](https://html.spec.whatwg.org/multipage/rendering.html).
+
+## Table display parsing (2026-11-11)
+
+ParseDisplay now accepts table-caption, table-row, table-cell, table-header-group,
+table-row-group, table-footer-group, table-column, and table-column-group. Each has
+an independent role flag, retained by Inner(), with no generic block/inline outer
+flag. TableMode remains the table-container flag; it is not a category bit for
+all parts. Existing table/inline-table mappings are unchanged. Symbol, FullString,
+Contains, Set, and Overlaps recognize the new flags; stale atomic String names
+were corrected and the formatter is now maintained directly.
+
+DisplayMode widens from uint16 to uint32 without changing existing flag values.
+Clients relying on binary layouts or uint16 conversions must adapt. New tests
+cover every table default, distinct roles, high-bit retention, formatting, legacy
+values, and invalid input. This does not add a table layout engine.

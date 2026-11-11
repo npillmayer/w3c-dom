@@ -3,7 +3,7 @@
 - **Font metadata resolved (2026-11-11):** font-family, font-size, font-weight, font-style, and unicode-bidi now have registry entries in Text. The four font properties inherit; unicode-bidi does not. Initial values are serif (this module’s UA choice), medium, normal, normal, and normal respectively. Regression tests cover defaults, overrides, inheritance and explicit keywords. Downstream metadata fallbacks can now be reassessed; font selection, relative sizing, weight computation and bidi processing still require downstream handling.
 - **Style extraction resolved (2026-11-11):** ExtractStyleElementsWithError recursively scans any subtree, concatenates complete descendant text for each style element, and returns successful sheets plus joined node-specific parse errors. FromHTMLParseTreeWithError propagates failures. Downstream recursive/error-reporting code can be reassessed against these APIs; the legacy extraction wrapper intentionally discards errors.
 - **CSS absolute units resolved (2026-11-11):** shared PX and PT constants and both parsers now use 96 px/in and 72 pt/in. DU remains 1/65536 of a CSS point. Metric parsing uses exact inch ratios before rounding. This removes the absolute-unit mismatch; downstream parent/root-relative computation remains necessary.
-- HTML defaults remain limited. Several supported inline tags still default to block upstream. Our supported-element checks cannot simply be removed.
+- **Inline display defaults resolved (2026-11-11):** supported phrasing/replaced elements now default to inline, with explicit block, list, table, control, and non-rendered element defaults. Unknown/custom elements also fall back to inline. Regression tests cover direct defaults and computed-style overrides. Downstream supported-element checks still matter: a display default is not evidence of layout support for that element.
 
 
 
@@ -67,3 +67,6 @@ Focused alias regressions were added on 2026-11-11.
 Dimension parsing now supports signed decimal values and checked scaling with
 half-away-from-zero rounding. RelativeValue exposes fractional font/viewport
 magnitudes. Overflow and fractional regression tests were added (2026-11-11).
+
+Table-part ParseDisplay support is resolved (2026-11-11), with distinct flags and
+regression coverage. DisplayMode is now uint32; table layout remains downstream.
