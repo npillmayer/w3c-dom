@@ -534,28 +534,42 @@ func (wl *W3CNodeList) String() string {
 
 // --------------------------------------------------------------------------------
 
-// FromHTMLParseTree returns a W3C DOM from parsed HTML and an optional style sheet.
-func FromHTMLParseTree(h *html.Node, css cssom.StyleSheet) *W3CNode {
-	if h == nil {
-		tracer().Infof("Cannot create DOM for null-HTML")
-		return nil
-	}
-	styles := douceuradapter.ExtractStyleElements(h)
-	tracer().Debugf("Extracted %d <style> elements", len(styles))
-	s := cssom.NewCSSOM(nil) // nil = no additional properties
-	for _, sty := range styles {
-		s.AddStylesForScope(nil, sty, cssom.Script)
-	}
-	if css != nil {
-		s.AddStylesForScope(nil, css, cssom.Author)
-	}
-	stytree, err := s.Style(h) //, styledtree.Creator())
+// FromHTMLParseTree constructs a DOM, logging errors and returning nil on failure.
+// Use FromHTMLParseTreeWithError for explicit extraction/styling diagnostics.
+func FromHTMLParseTree(h *html.Node, sheet cssom.StyleSheet) *W3CNode {
+	node, err := FromHTMLParseTreeWithError(h, sheet)
 	if err != nil {
-		tracer().Errorf("Cannot style test document: %s", err.Error())
-		return nil
+		tracer().Errorf("Cannot construct DOM: %v", err)
 	}
-	d := domify(stytree)
-	return d
+	return node
+}
+
+// FromHTMLParseTreeWithError constructs a DOM from HTML and an optional sheet.
+// Extraction errors abort construction rather than silently styling partial input.
+func FromHTMLParseTreeWithError(h *html.Node, sheet cssom.StyleSheet) (*W3CNode, error) {
+	if h == nil {
+		return nil, fmt.Errorf("cannot construct DOM from nil HTML")
+	}
+	styles, err := douceuradapter.ExtractStyleElementsWithError(h)
+	if err != nil {
+		return nil, err
+	}
+	engine := cssom.NewCSSOM(nil)
+	for _, sty := range styles {
+		if err := engine.AddStylesForScope(nil, sty, cssom.Script); err != nil {
+			return nil, err
+		}
+	}
+	if sheet != nil {
+		if err := engine.AddStylesForScope(nil, sheet, cssom.Author); err != nil {
+			return nil, err
+		}
+	}
+	root, err := engine.Style(h)
+	if err != nil {
+		return nil, err
+	}
+	return domify(root), nil
 }
 
 /*

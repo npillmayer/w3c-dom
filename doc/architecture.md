@@ -19,7 +19,7 @@ outside this module. There is no HTMLBook-specific validator here.
 | `style/cssom` | Sheet registration, selector matching, declaration ranking, styled-tree construction | Cascadia selectors; cached compiled selectors; subtree scopes; partial origin handling |
 | `style/cssom/douceuradapter` | Adapt douceur rules and extract embedded sheets | No external stylesheet fetching; extraction tolerates missing head/body and skips empty style elements |
 | `style/css` | Property retrieval and dimension, position, display helpers | Resolves inherit/initial/unset; relative lengths remain unresolved |
-| `dimen` | Fixed-point units, points, rectangles, parsing | `DU` is `int32`; 65,536 units per big point; `PX` equals `BP` by local convention |
+| `dimen` | Fixed-point units, points, rectangles, parsing | `DU` is `int32`; 65,536 units per big point; `PX = IN/96`, `PT = BP = IN/72` |
 | `domdbg` | DOT export and optional GraphViz SVG generation | Debug utility; `Dotty` needs the external `dot` program |
 
 The repository also contains a license, sample/generated DOT and SVG files, and
@@ -140,3 +140,29 @@ colors into `color.NRGBA`, returning errors for unsupported/context-dependent in
 its old approximate named-color output and nil-to-powderblue behavior. Palette data
 comes from golang.org/x/image/colornames. Background defaults retain the existing
 renderer sentinel; changing those defaults is separate from conversion support.
+
+The Text property group includes font-family, font-size, font-weight, font-style,
+and unicode-bidi. Font properties inherit; unicode-bidi does not. Generic serif is
+the module's UA-selected initial family; medium and normal remain symbolic values
+for downstream font resolution. Adding metadata does not implement font layout.
+
+## Embedded stylesheet extraction
+
+Use `douceuradapter.ExtractStyleElementsWithError` for recursive document/fragment
+scanning and complete text content. It returns valid sheets plus joined parse
+errors carrying source nodes. The legacy extractor discards those errors.
+`dom.FromHTMLParseTreeWithError` instead aborts construction on any extraction
+error; its legacy wrapper logs and returns nil. No partial DOM is returned.
+
+## CSS absolute units
+
+All module units now use CSS definitions: 96 pixels and 72 points per inch.
+`DU` stays int32, with 65,536 DU per CSS/PDF point. `PT` is now equal to `BP`;
+`PX` is 49,152 DU. Both parsers share `dimen.ParseAbsolute`. Decimal mm/cm
+conversion uses exact inch ratios before rounding, so 25.4mm and 2.54cm equal
+one inch exactly. MM/CM constants remain nearest-DU approximations.
+
+This intentionally changes existing px/pt results and border-width keyword sizes
+expressed through PX. Downstream TeX conversions must be defined downstream.
+`bp`, `sp`, and unitless-as-sp remain compatibility extensions. Parent/root-relative
+length computation and viewport/font metrics are still downstream responsibilities.

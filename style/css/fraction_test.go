@@ -30,7 +30,7 @@ func TestFractionalDimensionParsing(t *testing.T) {
 	if err != nil || d.Match().Percentage(&percent) == nil || percent != 81 {
 		t.Fatalf("percentage: %v %v", percent, err)
 	}
-	for _, s := range []string{"32768px", "-32768.01px", "2147483648sp", "1..2px", ".px", "NaNpx"} {
+	for _, s := range []string{"43691px", "-43691px", "2147483648sp", "1..2px", ".px", "NaNpx"} {
 		if d, err := css.ParseDimen(s); err == nil || !d.IsNone() {
 			t.Errorf("accepted %s", s)
 		}

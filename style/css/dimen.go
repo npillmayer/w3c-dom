@@ -255,31 +255,10 @@ func ParseDimen(s string) (DimenT, error) {
 	if len(d) < 2 {
 		return DimenT{}, errors.New("format error parsing dimension")
 	}
-	scale := dimen.SP
 	dim := JustDimen(0)
-	if len(d) > 2 {
-		switch strings.ToLower(d[2]) {
-		case "pt", "PT":
-			scale = dimen.PT
-		case "mm", "MM":
-			scale = dimen.MM
-		case "bp", "px", "BP", "PX":
-			scale = dimen.BP
-		case "cm", "CM":
-			scale = dimen.CM
-		case "in", "IN":
-			scale = dimen.IN
-		case "", "sp", "SP":
-			scale = dimen.SP
-		default:
-			u := strings.ToLower(d[2])
-			if unit, ok := relUnitStringMap[u]; ok {
-				dim = DimenT{}
-				dim.flags = unit
-			} else {
-				return DimenT{}, errors.New("format error parsing dimension")
-			}
-		}
+	unit := strings.ToLower(d[2])
+	if relative, ok := relUnitStringMap[unit]; ok {
+		dim = DimenT{flags: relative}
 	}
 	n, err := strconv.ParseFloat(d[1], 64)
 	if err != nil || math.IsInf(n, 0) || math.IsNaN(n) {
@@ -299,7 +278,7 @@ func ParseDimen(s string) (DimenT, error) {
 		}
 		return dim, nil
 	}
-	dim.d, err = dimen.ParseScaled(d[1], scale)
+	dim.d, err = dimen.ParseAbsolute(d[1], unit)
 	if err != nil {
 		return DimenT{}, err
 	}

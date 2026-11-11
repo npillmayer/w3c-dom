@@ -31,10 +31,10 @@ const (
 	Zero DU = 0
 	SP   DU = 1       // scaled point = BP / 65536
 	BP   DU = 65536   // big point (PDF) = 1/72 inch
-	PX   DU = 65536   // "pixels"
-	PT   DU = 65291   // printers point 1/72.27 inch
-	MM   DU = 185771  // millimeters
-	CM   DU = 1857710 // centimeters
+	PX   DU = IN / 96 // CSS pixel
+	PT   DU = BP      // CSS point = 1/72 inch
+	MM   DU = 185771  // nearest DU to one millimeter
+	CM   DU = 1857710 // nearest DU to one centimeter
 	IN   DU = 4718592 // inch
 )
 
@@ -109,29 +109,12 @@ func ParsePercent(s string) (DU, bool, error) {
 	if len(d) < 2 {
 		return 0, false, errors.New("format error parsing dimension")
 	}
-	scale := SP
-	ispcnt := false
-	if len(d) > 2 {
-		switch strings.ToLower(d[2]) {
-		case "pt", "PT":
-			scale = PT
-		case "mm", "MM":
-			scale = MM
-		case "bp", "px", "BP", "PX":
-			scale = BP
-		case "cm", "CM":
-			scale = CM
-		case "in", "IN":
-			scale = IN
-		case "sp", "SP", "":
-			scale = SP
-		case "%":
-			scale, ispcnt = 1, true
-		default:
-			return 0, false, errors.New("format error parsing dimension")
-		}
+	ispcnt := d[2] == "%"
+	unit := d[2]
+	if ispcnt {
+		unit = "sp"
 	}
-	value, err := ParseScaled(d[1], scale)
+	value, err := ParseAbsolute(d[1], unit)
 	if err != nil {
 		return 0, false, err
 	}
@@ -159,6 +142,32 @@ func Max(a, b DU) DU {
 // ParseScaled converts a decimal magnitude to design units, rounding half away
 // from zero. Values outside the int32 range before rounding are rejected.
 func ParseScaled(number string, scale DU) (DU, error) {
+	return parseRatio(number, int64(scale), 1)
+}
+
+// ParseAbsolute converts a decimal CSS absolute length to DU. bp and sp are
+// compatibility extensions; unitless input denotes sp. Metric units use exact
+// inch ratios before the final rounding, unlike multiplying rounded MM/CM constants.
+func ParseAbsolute(number, unit string) (DU, error) {
+	switch strings.ToLower(unit) {
+	case "px":
+		return parseRatio(number, int64(IN), 96)
+	case "pt", "bp":
+		return parseRatio(number, int64(IN), 72)
+	case "in":
+		return parseRatio(number, int64(IN), 1)
+	case "mm":
+		return parseRatio(number, int64(IN)*5, 127)
+	case "cm":
+		return parseRatio(number, int64(IN)*50, 127)
+	case "", "sp":
+		return parseRatio(number, 1, 1)
+	default:
+		return 0, fmt.Errorf("unsupported absolute unit %q", unit)
+	}
+}
+
+func parseRatio(number string, numerator, denominator int64) (DU, error) {
 	if !regexp.MustCompile(`^[+\-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$`).MatchString(number) {
 		return 0, fmt.Errorf("invalid dimension magnitude %q", number)
 	}
@@ -166,7 +175,7 @@ func ParseScaled(number string, scale DU) (DU, error) {
 	if !ok {
 		return 0, fmt.Errorf("invalid dimension magnitude %q", number)
 	}
-	value.Mul(value, new(big.Rat).SetInt64(int64(scale)))
+	value.Mul(value, big.NewRat(numerator, denominator))
 	if value.Cmp(new(big.Rat).SetInt64(math.MinInt32)) < 0 || value.Cmp(new(big.Rat).SetInt64(math.MaxInt32)) > 0 {
 		return 0, fmt.Errorf("dimension overflow: %s", number)
 	}

@@ -11,6 +11,8 @@ Copyright © 2017–2022 Norbert Pillmayer <norbert@pillmayer.com>
 package douceuradapter
 
 import (
+	"errors"
+	"fmt"
 	"github.com/aymerick/douceur/css"
 	"github.com/aymerick/douceur/parser"
 	"github.com/npillmayer/w3c-dom/style"
@@ -124,54 +126,66 @@ func (r Rule) IsImportant(key string) bool {
 
 var _ cssom.Rule = &Rule{}
 
-// ExtractStyleElements visits <head> and <body> elements in an HTML parse
-// tree and searches for embedded <style>s. It returns the content of
-// style-elements as style sheets. Nil input and missing head/body elements are
-// allowed. Empty style elements without content are skipped.
-func ExtractStyleElements(htmldoc *html.Node) []*CSSStyles {
-	head := findElement(atom.Head, htmldoc)
-	body := findElement(atom.Body, htmldoc)
-	css := extractStyles(head)
-	css2 := extractStyles(body)
-	for _, c := range css2 {
-		css = append(css, c)
-	}
-	return css
+// StyleExtractionError identifies the style element whose CSS failed to parse.
+// Node is a reference into the input tree, which extraction does not modify.
+type StyleExtractionError struct {
+	Node *html.Node
+	Err  error
 }
 
-func extractStyles(h *html.Node) []*CSSStyles {
-	var css []*CSSStyles
-	if h == nil {
-		return css
-	}
-	ch := h.FirstChild
-	for ch != nil {
-		if ch.DataAtom == atom.Style && ch.FirstChild != nil {
-			c, err := parser.Parse(ch.FirstChild.Data)
-			if err != nil {
-				break
+func (e *StyleExtractionError) Error() string {
+	return fmt.Sprintf("cannot parse style element: %v", e.Err)
+}
+func (e *StyleExtractionError) Unwrap() error { return e.Err }
+
+// ExtractStyleElements returns successfully parsed embedded sheets in tree order.
+// It ignores parse errors for compatibility; use ExtractStyleElementsWithError
+// when callers must distinguish complete extraction from partial results.
+func ExtractStyleElements(root *html.Node) []*CSSStyles {
+	sheets, _ := ExtractStyleElementsWithError(root)
+	return sheets
+}
+
+// ExtractStyleElementsWithError recursively scans root (including root itself)
+// for style elements, without requiring head/body containers. All descendant text
+// nodes of each style element are concatenated without inserted separators.
+// Empty/whitespace-only elements are skipped. Malformed sheets are omitted;
+// scanning continues and returns successful sheets plus joined node-specific errors.
+// Nil input returns no sheets and no error. The input tree is not modified.
+func ExtractStyleElementsWithError(root *html.Node) ([]*CSSStyles, error) {
+	var sheets []*CSSStyles
+	var failures []error
+	var visit func(*html.Node)
+	visit = func(n *html.Node) {
+		if n == nil {
+			return
+		}
+		if n.Type == html.ElementNode && (n.DataAtom == atom.Style || strings.EqualFold(n.Data, "style")) {
+			var content strings.Builder
+			var text func(*html.Node)
+			text = func(node *html.Node) {
+				if node.Type == html.TextNode {
+					content.WriteString(node.Data)
+				}
+				for ch := node.FirstChild; ch != nil; ch = ch.NextSibling {
+					text(ch)
+				}
 			}
-			css = append(css, Wrap(c))
+			text(n)
+			if strings.TrimSpace(content.String()) != "" {
+				sheet, err := parser.Parse(content.String())
+				if err != nil {
+					failures = append(failures, &StyleExtractionError{Node: n, Err: err})
+				} else {
+					sheets = append(sheets, Wrap(sheet))
+				}
+			}
+			return // style content is CSS, not a subtree of independent stylesheets
 		}
-		ch = ch.NextSibling
-	}
-	return css
-}
-
-func findElement(a atom.Atom, h *html.Node) *html.Node {
-	if h == nil {
-		return nil
-	}
-	if h.DataAtom == a {
-		return h
-	}
-	ch := h.FirstChild
-	for ch != nil {
-		r := findElement(a, ch)
-		if r != nil && r.DataAtom == a {
-			return r
+		for ch := n.FirstChild; ch != nil; ch = ch.NextSibling {
+			visit(ch)
 		}
-		ch = ch.NextSibling
 	}
-	return nil
+	visit(root)
+	return sheets, errors.Join(failures...)
 }

@@ -50,3 +50,12 @@ magnitudes. Overflow and fractional regression tests were added (2026-11-11).
 
 Color conversion now supports the named palette and common sRGB formats, with
 explicit ParseColor errors and alpha-preserving serialization (2026-11-11).
+
+The downstream missing-font-metadata finding is resolved for the five requested
+properties; font computation and layout remain downstream responsibilities.
+
+Recursive, complete-content stylesheet extraction and explicit extraction/DOM
+construction errors now address the downstream extraction finding (2026-11-11).
+
+CSS absolute units are now consistent throughout constants and both parsers:
+96 px/in and 72 pt/in, retaining fixed-point DU storage (2026-11-11).

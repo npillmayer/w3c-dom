@@ -13,8 +13,8 @@ func TestParseDimen(t *testing.T) {
 	d, _, err := ParsePercent("12px")
 	if err != nil {
 		t.Errorf("(1) %s", err.Error())
-	} else if d != 12*BP {
-		t.Errorf("(1) expected d to be 12bp (%d), is %d", 12*BP, d)
+	} else if d != 12*PX {
+		t.Errorf("(1) expected d to be 12px (%d), is %d", 12*PX, d)
 	}
 	//
 	d, _, err = ParsePercent("0")

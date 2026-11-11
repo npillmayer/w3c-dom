@@ -11,6 +11,12 @@ type propertyMetadata struct {
 }
 
 var propertyRegistry = map[string]propertyMetadata{
+	// CSS leaves the initial family to the UA; this module chooses generic serif.
+	"font-family":                {PGText, "serif", true},
+	"font-size":                  {PGText, "medium", true},
+	"font-weight":                {PGText, "normal", true},
+	"font-style":                 {PGText, "normal", true},
+	"unicode-bidi":               {PGText, "normal", false},
 	"margin-top":                 {PGMargins, "0", false},
 	"margin-left":                {PGMargins, "0", false},
 	"margin-right":               {PGMargins, "0", false},

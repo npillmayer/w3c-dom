@@ -69,3 +69,26 @@ func TestFromHTMLParseTreeEmptyStyle(t *testing.T) {
 		}
 	}
 }
+
+func TestDOMExtractionErrors(t *testing.T) {
+	h, err := html.Parse(strings.NewReader(`<div><style>p { broken; }</style></div>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node, err := dom.FromHTMLParseTreeWithError(h, nil); err == nil || node != nil {
+		t.Fatal("malformed nested sheet must fail construction")
+	}
+	if dom.FromHTMLParseTree(h, nil) != nil {
+		t.Fatal("legacy constructor must not hide failure")
+	}
+	if node, err := dom.FromHTMLParseTreeWithError(nil, nil); err == nil || node != nil {
+		t.Fatal("nil input must return error")
+	}
+	h, err = html.Parse(strings.NewReader(`<div><style>p {color:red}</style><p>x</p></div>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node, err := dom.FromHTMLParseTreeWithError(h, nil); err != nil || node == nil {
+		t.Fatalf("valid nested sheet: %v", err)
+	}
+}

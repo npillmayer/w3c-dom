@@ -188,8 +188,9 @@ percentages remain outside the bounded Percent model.
   in color expressions remain unsupported. Tests cover alpha, standard green,
   formats, clamping, invalid input and serialization round trips.
 - **Display:** display parsing still supports fewer modes than its flags represent.
-- **Errors and adapters:** `FromHTMLParseTree` logs styling errors and returns nil;
-  extraction stops silently after a CSS parse error. `CSSStyles.AppendRules`
+- **Errors and adapters:** `FromHTMLParseTree` logs construction errors and returns nil;
+  `FromHTMLParseTreeWithError` propagates extraction/styling errors. Recursive
+  extraction now reports errors and continues collecting valid sheets. `CSSStyles.AppendRules`
   asserts that another `StyleSheet` has the same concrete adapter type.
 - **P3 diagnostics:** DOT output uses raw property strings in HTML-like labels and
   panics on several writer failures. The root test creates DOT files in the source
@@ -242,3 +243,49 @@ The confirmed accessor panic paths are fixed, but do not assume arbitrary malfor
 node structures are supported, returned strings are resolved,
 or converting an unsupported value reports an error. Repair and regression tests
 in this module are preferable to duplicating fallback logic in clients.
+
+## Downstream font metadata follow-up (2026-11-11)
+
+The Text registry now includes inherited font-family (`serif`), font-size (`medium`),
+font-weight (`normal`), and font-style (`normal`), plus non-inherited unicode-bidi
+(`normal`). CSS leaves the initial font family to the UA; generic serif is this
+module's choice. Additional defaults override UA fallback values, while explicit
+`initial` continues to use the registry initial value. Family lists preserve case
+and quotes. See [CSS Fonts](https://www.w3.org/TR/css-fonts-4/) and
+[Writing Modes](https://www.w3.org/TR/css-writing-modes-3/).
+
+`style/css/font_metadata_test.go` exercises all five properties through styled-tree
+construction and CSS/DOM lookup, including root inherit, detached defaults,
+parent/child inheritance, initial barriers, unset, and configured defaults.
+This resolves the missing metadata finding, not font selection, shorthand `font`
+expansion, conversion of medium/relative sizes, bolder/lighter computation, or bidi
+layout. Downstream code doing those jobs remains necessary.
+
+## Downstream extraction follow-up (2026-11-11)
+
+`ExtractStyleElementsWithError` scans the supplied root and descendants in tree
+order, without head/body assumptions. Style content is the concatenation of all
+text descendants, without artificial separators; comment nodes are excluded.
+Empty/whitespace-only content is skipped. Each malformed sheet is omitted, with
+an exported `StyleExtractionError` carrying its original node and parser error.
+Joined errors report all failures; valid sheets before and after failures remain
+available. Extraction does not mutate the input. Nil input is an empty result.
+
+The legacy `ExtractStyleElements` wrapper discards errors but returns all valid
+sheets. `FromHTMLParseTreeWithError` rejects partial extraction and propagates the
+error; the existing DOM constructor logs and returns nil on failure. This makes
+malformed embedded CSS a construction failure instead of silently dropping it.
+Tests cover nested sheets, multiple failures, root-style fragments, split text,
+unchanged input, nil/empty input, and DOM error propagation. Parser acceptance is
+still governed by douceur; media/type filtering and external stylesheet fetching
+are not added by this change.
+
+## CSS unit consistency (2026-11-11)
+
+PX and PT now follow CSS ratios throughout the module, with both dimension parsers
+using one absolute-unit conversion helper. PT equals BP (not a TeX printer's point).
+Exact rational mm/cm scaling avoids compounding rounded per-unit constants.
+`style/css/units_test.go` checks constants, equivalence across inch/pixel/point/metric
+units, fractional/case variants, compatibility units, and updated overflow limits
+in both parsers. Fixed-point rounding and overflow policy are unchanged.
+The downstream absolute-unit mismatch is resolved; relative-size resolution is not.
