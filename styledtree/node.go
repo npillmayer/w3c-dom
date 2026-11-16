@@ -5,6 +5,7 @@ import (
 
 	"github.com/npillmayer/tree"
 	"github.com/npillmayer/w3c-dom/style"
+	"github.com/npillmayer/w3c-dom/style/display"
 	"golang.org/x/net/html"
 )
 
@@ -82,7 +83,7 @@ func (sn *StyNode) GetPropertyValue(key string, pmap *style.PropertyMap) style.P
 	}
 	ua := func(n *StyNode) style.Property {
 		v := defaults.DefaultProperty(n.HTMLNode(), key)
-		switch strings.ToLower(strings.TrimSpace(string(v))) {
+		switch propertyKeyword(key, v) {
 		case "inherit", "initial", "unset":
 			return initial
 		}
@@ -94,7 +95,7 @@ func (sn *StyNode) GetPropertyValue(key string, pmap *style.PropertyMap) style.P
 			return initial
 		}
 		value, _ := local.Property(key)
-		keyword := strings.ToLower(strings.TrimSpace(string(value)))
+		keyword := propertyKeyword(key, value)
 		if keyword == "initial" || (keyword == "unset" && !style.IsCascading(key)) {
 			return initial
 		}
@@ -160,4 +161,18 @@ func shortText(h *html.Node) string {
 	s = strings.Replace(s, "\t", `\\t`, -1)
 	s = strings.Replace(s, " ", "\u2423", -1)
 	return s
+}
+
+// Recognize escaped/commented display keywords even in directly supplied property
+// maps or UA overrides. This does not reinterpret other property grammars.
+func propertyKeyword(key string, value style.Property) string {
+	if key == "display" {
+		if _, keyword, err := display.ParseDeclaration(string(value)); err == nil {
+			return keyword.String()
+		}
+		// Invalid display syntax must not become a CSS-wide keyword through
+		// Unicode case folding or non-CSS whitespace trimming.
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(string(value)))
 }

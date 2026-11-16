@@ -25,7 +25,6 @@ Use symbols and files below rather than historical line numbers.
 | `style/convert.go:5` palette | Resolved: standard palette and common CSS color formats, with ParseColor errors | Advanced/context-dependent color formats remain open |
 | `style/css/option.go.refact:174` options | In inactive refactoring source, excluded from the build | Archive or remove once useful design material has been identified |
 | `style/css/option.go.refact:486` bidi variants | Also inactive; not an implemented bidirectional-text feature | Move to an explicit future scope decision if clients need it |
-| `style/css/display.go:126` display | `ParseDisplay` is implemented for a limited subset; its bare TODO overstates the absence of implementation | Replace with a supported-value list and specific missing modes |
 
 The root README does not capture the highest-impact current work: unsafe ancestor
 lookup, fresh map initialization, empty attribute maps, empty style extraction,
@@ -68,5 +67,5 @@ Dimension parsing now supports signed decimal values and checked scaling with
 half-away-from-zero rounding. RelativeValue exposes fractional font/viewport
 magnitudes. Overflow and fractional regression tests were added (2026-11-11).
 
-Table-part ParseDisplay support is resolved (2026-11-11), with distinct flags and
-regression coverage. DisplayMode is now uint32; table layout remains downstream.
+Table defaults resolve through css.GetDisplay to distinct InternalRole values.
+The old bitmask API is removed (2026-11-16); table layout remains downstream.

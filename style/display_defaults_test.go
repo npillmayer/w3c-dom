@@ -8,11 +8,11 @@ import (
 func TestHTMLDisplayDefaults(t *testing.T) {
 	for want, tags := range map[Property][]string{
 		"inline":       {"a", "acronym", "b", "blink", "br", "canvas", "code", "em", "i", "img", "label", "math", "picture", "q", "s", "span", "strong", "sup", "svg", "video", "small", "sub", "abbr", "custom-element", "EM"},
-		"block":        {"html", "body", "div", "article", "aside", "address", "blockquote", "figure", "figcaption", "footer", "form", "hr", "main", "nav", "menu", "pre", "ol", "ul", "section", "h1", "h6"},
+		"block":        {"html", "body", "p", "P", "div", "article", "aside", "address", "blockquote", "figure", "figcaption", "footer", "form", "hr", "main", "nav", "menu", "pre", "ol", "ul", "section", "h1", "h6"},
 		"none":         {"head", "title", "style", "script", "template", "meta", "link"},
 		"inline-block": {"button", "input", "textarea", "select"},
-		"list-item":    {"li", "summary"}, "block-inline": {"p"},
-		"table": {"table"}, "table-cell": {"td", "th"}, "table-row": {"tr"}, "table-caption": {"caption"}, "table-footer-group": {"tfoot"},
+		"list-item":    {"li", "summary"},
+		"table":        {"table"}, "table-cell": {"td", "th"}, "table-row": {"tr"}, "table-caption": {"caption"}, "table-footer-group": {"tfoot"},
 	} {
 		for _, tag := range tags {
 			if got := DisplayPropertyForHTMLNode(&html.Node{Type: html.ElementNode, Data: tag}); got != want {

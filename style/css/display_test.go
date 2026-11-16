@@ -1,65 +1,33 @@
 package css_test
 
 import (
-	"github.com/npillmayer/w3c-dom/style"
-	"github.com/npillmayer/w3c-dom/style/css"
-	"golang.org/x/net/html"
-	"strings"
 	"testing"
+
+	"github.com/npillmayer/w3c-dom/style/css"
+	"github.com/npillmayer/w3c-dom/style/display"
+	"github.com/npillmayer/w3c-dom/styledtree"
+	"golang.org/x/net/html"
 )
 
-func TestTableDisplayModes(t *testing.T) {
-	cases := []struct {
-		tag, value string
-		mode       css.DisplayMode
+// HTML defaults must resolve to distinct normalized roles through the public
+// accessor, without imposing a downstream table layout model.
+func TestTableDisplayDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		tag, spelling string
+		role          display.InternalRole
 	}{
-		{"caption", "table-caption", css.TableCaptionMode}, {"tr", "table-row", css.TableRowMode},
-		{"td", "table-cell", css.TableCellMode}, {"th", "table-cell", css.TableCellMode},
-		{"thead", "table-header-group", css.TableHeaderGroupMode}, {"tbody", "table-row-group", css.TableRowGroupMode},
-		{"tfoot", "table-footer-group", css.TableFooterGroupMode}, {"col", "table-column", css.TableColumnMode},
-		{"colgroup", "table-column-group", css.TableColumnGroupMode},
-	}
-	for _, tc := range cases {
-		raw := style.DisplayPropertyForHTMLNode(&html.Node{Type: html.ElementNode, Data: tc.tag})
-		if string(raw) != tc.value {
-			t.Fatalf("%s default=%s", tc.tag, raw)
-		}
-		got, err := css.ParseDisplay(string(raw))
-		if err != nil || got != tc.mode {
-			t.Fatalf("%s=%v %v", raw, got, err)
-		}
-		if got.Outer() != css.NoMode || got.Inner() != tc.mode || got.IsBlockLevel() {
-			t.Errorf("wrong role flags for %s", raw)
-		}
-		if !got.Contains(tc.mode) || !got.Overlaps(tc.mode) || got.Overlaps(css.TableMode) {
-			t.Errorf("wrong membership for %s", raw)
-		}
-		if got.String() != got.FullString() || strings.HasPrefix(got.String(), "DisplayMode(") || got.Symbol() == "?" {
-			t.Errorf("missing diagnostics for %s", raw)
-		}
-		var set css.DisplayMode
-		set.Set(tc.mode)
-		if set != got {
-			t.Errorf("Set lost %s", raw)
-		}
-		for _, other := range cases {
-			if other.mode != tc.mode && got.Overlaps(other.mode) {
-				t.Errorf("%s overlaps %s", raw, other.value)
+		{"caption", "table-caption", display.TableCaption}, {"tr", "table-row", display.TableRow},
+		{"td", "table-cell", display.TableCell}, {"th", "table-cell", display.TableCell},
+		{"thead", "table-header-group", display.TableHeaderGroup}, {"tbody", "table-row-group", display.TableRowGroup},
+		{"tfoot", "table-footer-group", display.TableFooterGroup}, {"col", "table-column", display.TableColumn},
+		{"colgroup", "table-column-group", display.TableColumnGroup},
+	} {
+		t.Run(tc.tag, func(t *testing.T) {
+			node := styledtree.NewNodeForHTMLNode(&html.Node{Type: html.ElementNode, Data: tc.tag}).Payload
+			got, err := css.GetDisplay(node)
+			if err != nil || got.Kind() != display.Internal || got.InternalRole() != tc.role || got.CSS() != tc.spelling || got.Outer() != display.NoOutside || got.Inner() != display.NoInside {
+				t.Fatalf("GetDisplay(%s) = %v, %v", tc.tag, got, err)
 			}
-		}
-	}
-}
-func TestExistingDisplayModes(t *testing.T) {
-	for text, want := range map[string]css.DisplayMode{"": css.NoMode, "none": css.DisplayNone, "block": css.BlockMode | css.InnerBlockMode, "inline": css.InlineMode | css.InnerInlineMode, "block-inline": css.BlockMode | css.InnerInlineMode, "inline-block": css.InlineMode | css.InnerBlockMode, "list-item": css.BlockMode | css.ListItemMode, "table": css.BlockMode | css.TableMode, "inline-table": css.InlineMode | css.TableMode} {
-		got, err := css.ParseDisplay(text)
-		if err != nil || got != want {
-			t.Errorf("%s=%v %v", text, got, err)
-		}
-	}
-	if _, err := css.ParseDisplay("table-invalid"); err == nil {
-		t.Fatal("accepted invalid display")
-	}
-	if css.BlockMode.String() != "BlockMode" || css.InnerInlineMode.String() != "InnerInlineMode" {
-		t.Fatal("stale atomic names")
+		})
 	}
 }

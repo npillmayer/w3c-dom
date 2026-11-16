@@ -106,9 +106,7 @@ func DisplayPropertyForHTMLNode(node *html.Node) Property {
 	switch strings.ToLower(node.Data) {
 	case "head", "title", "base", "link", "meta", "style", "script", "template":
 		return "none"
-	case "p":
-		return "block-inline" // retained paragraph formatting convention
-	case "html", "body", "address", "article", "aside", "blockquote", "div",
+	case "html", "body", "p", "address", "article", "aside", "blockquote", "div",
 		"figcaption", "figure", "footer", "form", "header", "hr", "main", "nav",
 		"h1", "h2", "h3", "h4", "h5", "h6", "ol", "ul", "menu", "pre", "section",
 		"dl", "dt", "dd", "fieldset", "details":

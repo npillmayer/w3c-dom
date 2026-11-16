@@ -296,31 +296,25 @@ The downstream absolute-unit mismatch is resolved; relative-size resolution is n
 `DisplayPropertyForHTMLNode` now uses inline as the fallback, fixing links,
 emphasis, code, labels, quotes, superscripts, images, and other supported inline
 content. Explicit defaults cover block containers, list items, common controls,
-table parts, and non-rendered metadata. The existing paragraph `block-inline`
-convention and document/text/nil behavior are retained. HTML names are matched
+table parts, and non-rendered metadata. Paragraphs now use the standard `block` default; inline grouping belongs to
+layout. Document/text/nil behavior is retained. HTML names are matched
 case-insensitively. Unknown/custom elements now default to inline rather than block.
 
 `style/display_defaults_test.go` covers tag classifications;
 `style/css/html_display_test.go` checks styled-tree/DOM lookup and explicit block,
 inherit, initial, and unset declarations. Defaults do not expand the styling
-allowlist or add layout implementations. Table-part strings now have distinct typed ParseDisplay modes. Attribute/context-specific
+allowlist or add layout implementations. Table-part strings have distinct normalized InternalRole values. Attribute/context-specific
 widget behavior, hidden attributes, namespace-specific rules, and full browser UA
 stylesheets remain outside this tag-based approximation. Downstream supported-tag
 checks should not be removed solely because these defaults exist.
 
 Reference: [HTML rendering defaults](https://html.spec.whatwg.org/multipage/rendering.html).
 
-## Table display parsing (2026-11-11)
+## Normalized display API cleanup (2026-11-16)
 
-ParseDisplay now accepts table-caption, table-row, table-cell, table-header-group,
-table-row-group, table-footer-group, table-column, and table-column-group. Each has
-an independent role flag, retained by Inner(), with no generic block/inline outer
-flag. TableMode remains the table-container flag; it is not a category bit for
-all parts. Existing table/inline-table mappings are unchanged. Symbol, FullString,
-Contains, Set, and Overlaps recognize the new flags; stale atomic String names
-were corrected and the formatter is now maintained directly.
-
-DisplayMode widens from uint16 to uint32 without changing existing flag values.
-Clients relying on binary layouts or uint16 conversions must adapt. New tests
-cover every table default, distinct roles, high-bit retention, formatting, legacy
-values, and invalid input. This does not add a table layout engine.
+The temporary DisplayMode/ParseDisplay compatibility API and its formatters
+have been removed after migration of the document pipeline. Table-default tests
+now exercise css.GetDisplay and display.InternalRole. Normalized parsing,
+canonical aliases, invalid private block-inline input, and cascade fallback/error
+behavior remain covered by style/display and style/css tests. This does not add
+table layout support.

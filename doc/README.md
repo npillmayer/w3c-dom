@@ -63,5 +63,6 @@ CSS absolute units are now consistent throughout constants and both parsers:
 Supported inline elements now receive inline display defaults; tag classification
 and explicit display override tests cover the downstream finding (2026-11-11).
 
-ParseDisplay now recognizes all table-part values returned by the HTML defaults,
-with distinct typed flags and regression coverage (2026-11-11).
+Normalized `css.GetDisplay`/`display.Parse` cover table parts with distinct
+InternalRole values. The old bitmask API is removed; table-default and alias
+regressions exercise the normalized API (2026-11-16).

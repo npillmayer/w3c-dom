@@ -168,9 +168,10 @@ expressed through PX. Downstream TeX conversions must be defined downstream.
 length computation and viewport/font metrics are still downstream responsibilities.
 
 HTML tag defaults now use inline fallback with explicit block/list/table/control
-and non-rendered exceptions. The paragraph block-inline convention remains.
-This table is separate from the styling allowlist and layout capabilities; table-part values now have typed ParseDisplay roles but do not imply table layout
+and non-rendered exceptions. Paragraphs use the standard block default; inline grouping belongs to layout.
+This table is separate from the styling allowlist and layout capabilities; table-part values have normalized `display.InternalRole` values but do not imply table layout
 support.
 
-DisplayMode uses uint32 to represent distinct table-part flags. Inner retains those
-roles; table/inline-table retain their existing container and outer flags.
+`css.GetDisplay` returns normalized `display.Value` values. Table parts use
+Kind Internal and InternalRole; table/inline-table use explicit outer/inner
+pairs. The former bitmask API has been removed.
