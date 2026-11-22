@@ -482,8 +482,28 @@ func findAncestorWithPropertyGroup(sn *tree.Node[*styledtree.StyNode], group str
 //
 // If either dom or creator are nil, no tree is returned (but an error).
 func (cssom CSSOM) Style(dom *html.Node) (*tree.Node[*styledtree.StyNode], error) {
+	return cssom.StyleWithOptions(dom, StyleOptions{})
+}
+
+// StyleOptions controls construction of a styled view of an HTML source tree.
+// The zero value preserves Style's complete-tree behavior.
+type StyleOptions struct {
+	// SkipSubtree excludes a node and its descendants from the styled tree,
+	// including inline-style collection. It does not remove HTML nodes: selector
+	// matching still sees the original ancestry, attributes and sibling positions.
+	// The callback must be read-only and safe for concurrent calls. It is not
+	// called on descendants of an excluded node. Excluding the root is an error.
+	SkipSubtree func(*html.Node) bool
+}
+
+// StyleWithOptions styles the original HTML tree with an optional traversal
+// boundary. It never reparents or edits the input. A failed call returns no tree.
+func (cssom CSSOM) StyleWithOptions(dom *html.Node, opts StyleOptions) (*tree.Node[*styledtree.StyNode], error) {
 	if dom == nil {
 		return nil, errors.New("Nothing to style: empty document")
+	}
+	if opts.SkipSubtree != nil && opts.SkipSubtree(dom) {
+		return nil, errors.New("root excluded from styling")
 	}
 	// if creator == nil {
 	// 	return nil, errors.New("Cannot style: no builder to create styles nodes")
@@ -497,7 +517,7 @@ func (cssom CSSOM) Style(dom *html.Node) (*tree.Node[*styledtree.StyNode], error
 	createNodes := func(node *tree.Node[*styledtree.StyNode], parent *tree.Node[*styledtree.StyNode],
 		pos int) (*tree.Node[*styledtree.StyNode], error) {
 		//
-		return createStyledChildren(node, cssom.rulesTree) // provide closure with style creator
+		return createStyledChildren(node, cssom.rulesTree, opts)
 	}
 	future := walker.TopDown(createNodes).Promise() // build the style tree
 	if _, err := future(); err != nil {
@@ -527,7 +547,7 @@ func (cssom CSSOM) Style(dom *html.Node) (*tree.Node[*styledtree.StyNode], error
 
 // Pre-condition: sn has been styled and points to an HTML node.
 // Now iterate through the HTML children and create styled nodes for each.
-func createStyledChildren(parent *tree.Node[*styledtree.StyNode], rulesTree *rulesTreeType) (*tree.Node[*styledtree.StyNode], error) {
+func createStyledChildren(parent *tree.Node[*styledtree.StyNode], rulesTree *rulesTreeType, opts StyleOptions) (*tree.Node[*styledtree.StyNode], error) {
 	//
 	domnode := parent.Payload
 	//domnode := creator.ToStyler(parent)
@@ -536,11 +556,13 @@ func createStyledChildren(parent *tree.Node[*styledtree.StyNode], rulesTree *rul
 	if h.Type == html.ElementNode || h.Type == html.DocumentNode {
 		ch := h.FirstChild
 		for ch != nil {
+			if opts.SkipSubtree != nil && opts.SkipSubtree(ch) {
+				ch = ch.NextSibling
+				continue
+			}
 			if ch.DataAtom == atom.Style { // <style> element
 				tracer().Infof("<style> nodes have to be extracted in advance")
 			} else if isInDom(ch.Type, ch.DataAtom) {
-				//} else if isStylable(ch.DataAtom) {
-				//sn := creator.StyleForHTMLNode(ch)
 				sn := styledtree.NewNodeForHTMLNode(ch)
 				parent.AddChild(sn) // sn will be sent to next pipeline stage
 				if styleAttr := getStyleAttribute(ch); styleAttr != nil {
@@ -567,25 +589,6 @@ func isInDom(nt html.NodeType, a atom.Atom) bool {
 	return false
 }
 
-func isStylable(a atom.Atom) bool {
-	switch a {
-	case atom.A, atom.Address, atom.Acronym, atom.Article, atom.Aside,
-		atom.B, atom.Blink, atom.Blockquote, atom.Body, atom.Br,
-		atom.Button, atom.Label, atom.Canvas, atom.Caption,
-		atom.Code, atom.Content, atom.Div, atom.Em, atom.Figcaption,
-		atom.Figure, atom.Footer, atom.Form, atom.Frame, atom.Hr,
-		atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6, atom.Html,
-		atom.I, atom.Img, atom.Input, atom.Li, atom.Main, atom.Math,
-		atom.Menu, atom.Menuitem, atom.Nav, atom.Ol, atom.Option,
-		atom.P, atom.Picture, atom.Pre, atom.Poster, atom.Q, atom.S,
-		atom.Section, atom.Span, atom.Spacer, atom.Strong, atom.Summary,
-		atom.Svg, atom.Sup, atom.Table, atom.Td, atom.Tr, atom.Th,
-		atom.Textarea, atom.Tfoot, atom.Title, atom.Ul, atom.Video:
-		return true
-	}
-	return false
-}
-
 func createStylesForNode(node *tree.Node[*styledtree.StyNode], rulesTree *rulesTreeType,
 	splitters []CompoundPropertiesSplitter) (*tree.Node[*styledtree.StyNode], error) {
 	//
@@ -593,7 +596,8 @@ func createStylesForNode(node *tree.Node[*styledtree.StyNode], rulesTree *rulesT
 	h := node.Payload.HTMLNode()
 	//h := styler.HTMLNode()
 	if h.Type == html.DocumentNode || h.Type == html.ElementNode {
-		if isStylable(h.DataAtom) {
+		// Source styling is independent of a client's supported layout elements.
+		if h.Type == html.ElementNode {
 			matchlist := rulesTree.FilterMatchesFor(h)
 			if matchlist != nil && len(matchlist.matchingRules) != 0 {
 				matchlist.SortProperties(splitters)

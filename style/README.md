@@ -39,6 +39,25 @@ real data structures are more involved):
 
 CSSOM is the "CSS Object Model", similar to the DOM for HTML.
 
+## Source-tree styling boundaries
+
+`cssom.CSSOM.Style` styles the complete input tree. `StyleWithOptions` accepts
+`StyleOptions{SkipSubtree: ...}` to exclude selected source subtrees from the
+styled tree and inline-style collection. The callback must be read-only and
+safe for concurrent calls; excluding the root is an error. The zero options
+preserve ordinary Style traversal.
+
+Neither entry point edits or reparents the HTML input. Selectors still see its
+original ancestry, attributes and sibling positions, including excluded nodes.
+This lets a content adapter retain source context while excluding inert template
+contents or metadata from its styled material. CSS applies to all included
+elements, including `bdi`, `small` and custom elements; supported layout-element
+profiles belong to consumers, not the CSS cascade.
+
+Callers extract and inspect head stylesheets explicitly before registration.
+Traversal exclusion does not inspect stylesheets or define resource-loading
+policy for them. Pagelayout's CONT-01 adapter supplies those policies.
+
 ## Caveats
 
 Browsers are large and complex pieces of software, a fact that implies that
