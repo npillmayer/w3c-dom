@@ -13,7 +13,7 @@ func TestCascadedPropertyBoundaries(t *testing.T) {
 	child := styledtree.NewNodeForHTMLNode(&html.Node{Type: html.ElementNode, Data: "p"})
 	root.AddChild(child)
 	for _, node := range []*styledtree.StyNode{root.Payload, child.Payload} {
-		if got, err := GetProperty(node, "color"); err != nil || got != "default" {
+		if got, err := GetProperty(node, "color"); err != nil || got != "black" {
 			t.Fatalf("default color = %q, %v", got, err)
 		}
 		for _, key := range []string{"unknown"} {
@@ -25,7 +25,7 @@ func TestCascadedPropertyBoundaries(t *testing.T) {
 	local := style.NewPropertyMap()
 	local.Add("background-color", "blue") // same group, absent requested key
 	child.Payload.SetStyles(local)
-	if got, err := GetProperty(child.Payload, "color"); err != nil || got != "default" {
+	if got, err := GetProperty(child.Payload, "color"); err != nil || got != "black" {
 		t.Fatalf("partial group lookup = %q, %v", got, err)
 	}
 	local.Add("color", "red")
@@ -33,7 +33,7 @@ func TestCascadedPropertyBoundaries(t *testing.T) {
 		t.Fatalf("local color = %q, %v", got, err)
 	}
 	detached := styledtree.NewNodeForHTMLNode(&html.Node{Type: html.ElementNode, Data: "p"}).Payload
-	if got, err := GetProperty(detached, "color"); err != nil || got != "default" {
+	if got, err := GetProperty(detached, "color"); err != nil || got != "black" {
 		t.Fatalf("detached default = %q, %v", got, err)
 	}
 	for _, node := range []*styledtree.StyNode{nil} {

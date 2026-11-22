@@ -4,14 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/andybalholm/cascadia"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tree"
 	"github.com/npillmayer/w3c-dom/style"
-	"github.com/npillmayer/w3c-dom/style/display"
 	"github.com/npillmayer/w3c-dom/styledtree"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -383,18 +381,13 @@ func (matches *matchesList) createStyleGroups(parent *tree.Node[*styledtree.StyN
 	done := make(map[string]bool, len(matches.propertiesTable))
 	for _, pspec := range matches.propertiesTable { // for every specifity entry
 		pspec.propertyKey = style.CanonicalPropertyKey(pspec.propertyKey)
-		if strings.EqualFold(pspec.propertyKey, "display") {
-			pspec.propertyKey = "display"
-			_, keyword, err := display.ParseDeclaration(string(pspec.propertyValue))
-			if err != nil {
-				continue
-			}
-			// Keep ordinary spellings for inspection; normalize CSS-wide tokens
-			// for the existing inheritance/default-resolution machinery.
-			if keyword != display.NoKeyword {
-				pspec.propertyValue = style.Property(keyword.String())
-			}
+
+		value, err := style.NormalizeDeclaration(pspec.propertyKey, pspec.propertyValue)
+		if err != nil {
+			continue
 		}
+		pspec.propertyValue = value
+
 		if done[pspec.propertyKey] {
 			// already present in current properties map
 			// this must be from previous set with higher specifity

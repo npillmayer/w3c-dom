@@ -2,6 +2,7 @@ package style
 
 import (
 	"fmt"
+	"github.com/npillmayer/w3c-dom/internal/csssyntax"
 	"image/color"
 	"math"
 	"regexp"
@@ -52,7 +53,7 @@ func component(s string, scale float64) (float64, error) {
 // hsl/hsla and hwb. RGB/HSL accept legacy comma or modern space/slash syntax.
 // Results are non-premultiplied sRGB. Contextual and advanced color spaces return errors.
 func ParseColor(s string) (color.NRGBA, error) {
-	s = strings.ToLower(strings.TrimSpace(s))
+	s = csssyntax.Lower(strings.Trim(s, csssyntax.Space))
 	bad := func() (color.NRGBA, error) {
 		return color.NRGBA{}, fmt.Errorf("unsupported or invalid CSS color %q", s)
 	}

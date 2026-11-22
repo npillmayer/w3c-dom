@@ -83,6 +83,11 @@ func (sn *StyNode) GetPropertyValue(key string, pmap *style.PropertyMap) style.P
 	}
 	ua := func(n *StyNode) style.Property {
 		v := defaults.DefaultProperty(n.HTMLNode(), key)
+		if key == "color" {
+			if c, err := style.ParseColorValue(string(v)); err == nil && c.Current {
+				return initial
+			}
+		}
 		switch propertyKeyword(key, v) {
 		case "inherit", "initial", "unset":
 			return initial
@@ -96,6 +101,11 @@ func (sn *StyNode) GetPropertyValue(key string, pmap *style.PropertyMap) style.P
 		}
 		value, _ := local.Property(key)
 		keyword := propertyKeyword(key, value)
+		if key == "color" {
+			if c, err := style.ParseColorValue(string(value)); err == nil && c.Current {
+				keyword = "inherit"
+			}
+		}
 		if keyword == "initial" || (keyword == "unset" && !style.IsCascading(key)) {
 			return initial
 		}

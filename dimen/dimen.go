@@ -16,6 +16,7 @@ import (
 	"math"
 	"math/big"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -156,6 +157,10 @@ func ParseAbsolute(number, unit string) (DU, error) {
 		return parseRatio(number, int64(IN), 72)
 	case "in":
 		return parseRatio(number, int64(IN), 1)
+	case "pc":
+		return parseRatio(number, int64(IN), 6)
+	case "q":
+		return parseRatio(number, int64(IN)*5, 508)
 	case "mm":
 		return parseRatio(number, int64(IN)*5, 127)
 	case "cm":
@@ -167,10 +172,19 @@ func ParseAbsolute(number, unit string) (DU, error) {
 	}
 }
 
+var magnitudePattern = regexp.MustCompile(`^[+\-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+\-]?[0-9]+)?$`)
+
 func parseRatio(number string, numerator, denominator int64) (DU, error) {
-	if !regexp.MustCompile(`^[+\-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$`).MatchString(number) {
+	if !magnitudePattern.MatchString(number) {
 		return 0, fmt.Errorf("invalid dimension magnitude %q", number)
 	}
+	approx, err := strconv.ParseFloat(number, 64)
+	if err != nil || math.IsInf(approx, 0) || math.IsNaN(approx) {
+		return 0, fmt.Errorf("dimension magnitude overflow: %s", number)
+	}
+	if approx == 0 {
+		return 0, nil
+	} // Includes underflow, necessarily below one DU.
 	value, ok := new(big.Rat).SetString(number)
 	if !ok {
 		return 0, fmt.Errorf("invalid dimension magnitude %q", number)

@@ -1,5 +1,7 @@
 # Finding from downstream modules:
 
+- **DOM-02 resolved (2026-11-22):** checked box lengths, colors, flow names, keywords and effective borders are available. Supported declaration values are validated before duplicate/cascade reduction, with DOM-01 source diagnostics retained. See [the supported scope](architecture.md#checked-box-values-and-defaults-dom-02). Full border/background shorthands remain DOM-03.
+
 - **Font metadata resolved (2026-11-11):** font-family, font-size, font-weight, font-style, and unicode-bidi now have registry entries in Text. The four font properties inherit; unicode-bidi does not. Initial values are serif (this module’s UA choice), medium, normal, normal, and normal respectively. Regression tests cover defaults, overrides, inheritance and explicit keywords. Downstream metadata fallbacks can now be reassessed; font selection, relative sizing, weight computation and bidi processing still require downstream handling.
 - **Style extraction resolved (2026-11-11):** ExtractStyleElementsWithError recursively scans any subtree, concatenates complete descendant text for each style element, and returns successful sheets plus joined node-specific parse errors. FromHTMLParseTreeWithError propagates failures. Downstream recursive/error-reporting code can be reassessed against these APIs; the legacy extraction wrapper intentionally discards errors.
 - **CSS absolute units resolved (2026-11-11):** shared PX and PT constants and both parsers now use 96 px/in and 72 pt/in. DU remains 1/65536 of a CSS point. Metric parsing uses exact inch ratios before rounding. This removes the absolute-unit mismatch; downstream parent/root-relative computation remains necessary.
@@ -18,7 +20,7 @@ Use symbols and files below rather than historical line numbers.
 | `dom.go:302` pseudo-elements | Still open: `computedStyles` has no pseudo-element selector argument or model | Feature backlog; after safe property resolution |
 | `dimen/dimen.go:66` image.Point methods | Still open; `Point` has `Shift`, but no broader parity goal is defined | Low priority; specify actual client geometry needs |
 | `style/defaults.go:66` user-agent defaults | Resolved for supported properties: shared metadata, element defaults, and correctly grouped overrides | Broader CSS property coverage remains open |
-| `style/defaults.go:182` transparent background | Still uses the renderer-specific `default` sentinel; `Property.Color` now supports transparent | Decide the renderer contract and implement/test transparency end to end |
+| `style/defaults.go:182` transparent background | DOM-02 resolves the registry default to transparent and provides checked sRGB/currentcolor access | Verify transparency in downstream renderers; legacy conversion helpers retain sentinel compatibility |
 | `style/defaults.go:221` position | Historical commented-out `Background` type, removed during registry consolidation | Archive as design history; do not confuse it with active position helper defects |
 | `style/cssom/cssom.go:495` pipeline overlap | Still open in `CSSOM.Style`; construction and styling remain separate synchronized passes | Defer until correctness and parent/group ordering invariants are tested |
 | `style/cssom/cssom.go:664` node path | `nodePath` still provides only a short label | Low priority diagnostic enhancement |

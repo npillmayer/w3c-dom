@@ -8,7 +8,6 @@ import (
 	"github.com/andybalholm/cascadia"
 	"github.com/gorilla/css/scanner"
 	"github.com/npillmayer/w3c-dom/style"
-	"github.com/npillmayer/w3c-dom/style/display"
 )
 
 // Diagnostic reports a CSS inspection failure. Rule and Declaration are
@@ -27,7 +26,7 @@ func (d Diagnostic) Unwrap() error { return d.Err }
 
 // SourceDeclaration retains every declaration, including duplicates and invalid
 // declarations, before cascade reduction. Valid denotes syntax and currently
-// implemented value checks (display), not support for every property's grammar.
+// implemented box/display value checks, not support for every property's grammar.
 type SourceDeclaration struct {
 	Index            int
 	Line, Column     int
@@ -235,8 +234,8 @@ func inspectDeclarations(tokens []*scanner.Token, rule int) ([]SourceDeclaration
 		}
 		if !d.Valid {
 			diagnostics = append(diagnostics, Diagnostic{Code: "css.declaration-syntax", Message: "malformed CSS declaration", Rule: rule, Declaration: d.Index, Line: d.Line, Column: d.Column, Property: d.Property})
-		} else if strings.EqualFold(d.Property, "display") {
-			if _, _, err := display.ParseDeclaration(string(d.Value)); err != nil {
+		} else {
+			if _, err := style.NormalizeDeclaration(d.Property, d.Value); err != nil {
 				d.Valid = false
 				diagnostics = append(diagnostics, Diagnostic{Code: "css.invalid-value", Message: err.Error(), Rule: rule, Declaration: d.Index, Line: d.Line, Column: d.Column, Property: d.Property, Err: err})
 			}

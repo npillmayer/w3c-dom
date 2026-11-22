@@ -138,8 +138,9 @@ colors into `color.NRGBA`, returning errors for unsupported/context-dependent in
 `Property.Color` preserves its legacy invalid-input black fallback and nil for
 `default`. `ColorString` now emits hex with alpha (or transparent/default), replacing
 its old approximate named-color output and nil-to-powderblue behavior. Palette data
-comes from golang.org/x/image/colornames. Background defaults retain the existing
-renderer sentinel; changing those defaults is separate from conversion support.
+comes from golang.org/x/image/colornames. DOM-02 replaces registry color sentinels with black foreground (the print UA
+choice), transparent background and currentcolor borders. The legacy conversion
+helpers still recognize the explicit renderer sentinel for compatibility.
 
 The Text property group includes font-family, font-size, font-weight, font-style,
 and unicode-bidi. Font properties inherit; unicode-bidi does not. Generic serif is
@@ -165,9 +166,9 @@ Unsupported at-rules retain their text as opaque rules and receive diagnostics;
 inspection never fetches external resources.
 
 `cssom.InspectInlineStyle` uses the same declaration handling as permissive inline
-styling. Invalid syntax and invalid `display` values are observable before they
-are dropped. Other property value grammars remain the responsibility of later
-validation; a declaration's `Valid` flag does not promise complete CSS support.
+styling. Invalid syntax and invalid values in the checked display/box subset are observable
+before they are dropped. Unimplemented property grammars remain the responsibility
+of later validation; a declaration's `Valid` flag does not promise complete CSS support.
 Selector parsing uses the cascade engine's Cascadia parser. Strict callers must
 reject any diagnostics before using the successful subset in `Sheet` or invoking
 `Style`. Ordinary `Style` and the existing douceur adapter remain permissive.
@@ -175,6 +176,62 @@ reject any diagnostics before using the successful subset in `Sheet` or invoking
 The template loader in `pagelayout/template` uses this explicit reporting path.
 It attaches original HTML source identities to diagnostics, checks shared sheets
 once, and checks inline styles before styling isolated active documents.
+
+## Checked box values and defaults (DOM-02)
+
+`style.NormalizeDeclaration` validates supported values before duplicate reduction
+in both inspected and legacy sheets and inline attributes, and again before
+winning effective declarations enter property maps. Invalid higher-priority
+values cannot erase earlier valid ones. DOM-01 retains the invalid source and
+reports `css.invalid-value`. Existing four-sided edge shorthands are validated as
+whole declarations and preserve function arguments; full `border`/`background`
+shorthand/reset semantics remain DOM-03.
+
+The supported subset covers physical width/height/min/max sizes, insets, margins,
+padding, border width/style/color, foreground/background color, simple named flows,
+box sizing, writing mode, direction, position, float and visibility. Unknown
+properties remain permissive. CSS-wide tokens are decoded and normalized;
+`revert`/`revert-layer` remain unevaluated and checked accessors return errors.
+Math and variable/environment functions remain opaque in the permissive cascade;
+these functions are not evaluated or fully grammar-validated by this stage.
+Checked accessors reject them until the required evaluation stage exists.
+
+- `style.ParseBoxLength` and `css.GetBoxLength` distinguish absolute DU values,
+  fractional percentages without clamping, relative magnitudes/units, and symbolic
+  sizing keywords. Unitless zero is valid; nonzero unitless and legacy bp/sp input
+  is rejected by this checked CSS API. CSS absolute units (including pc and Q)
+  and decimal/exponent notation use checked `dimen.ParseAbsolute` conversion.
+  Property-specific negativity is checked before rounding. Used-value resolution
+  and layout are separate; DU values must be converted to CSS pixels for the
+  box-layout boundary.
+- `style.ParseColorValue` retains currentcolor symbolically; `css.GetColor`
+  resolves it on the receiving element to non-premultiplied sRGB. On `color`
+  itself, currentcolor behaves as inheritance. Elsewhere an inherited currentcolor
+  keyword resolves against the recipient's foreground.
+- `style.ParseFlowName` and `css.GetFlowName` decode escaped identifiers and
+  preserve case. Empty means none. Reserved names are rejected. flow-from and
+  flow-into do not inherit implicitly; optional flow-into modifiers are not in
+  this first subset.
+- `style.ParseBoxKeyword` / `css.GetBoxKeyword` check box enum values.
+  box-sizing defaults to content-box and does not inherit; writing-mode defaults
+  to horizontal-tb and inherits. min-width/min-height now default to auto.
+- `css.GetBorder` returns each physical edge's style, sRGB color and effective DU
+  width. none/hidden have zero width, including when that computed width is
+  explicitly inherited by a child with a visible border. Relative nonzero widths
+  need font resolution. UA keyword widths retain the existing .5/1/2px policy
+  for thin/medium/thick; no device-pixel snapping is performed here.
+
+Color defaults follow a fixed print-UA choice of black for the foreground,
+transparent background and currentcolor borders. This intentionally changes raw
+`GetProperty` / DOM accessor results that previously returned `default` or fixed
+black border colors. `Property.Color` and `ColorString(nil)` retain their legacy
+sentinel compatibility, but the checked accessors never return sentinels.
+
+Standards consulted for these contracts: [CSS Color resolving rules](https://www.w3.org/TR/css-color-4/#resolving-other-colors),
+[border width semantics](https://www.w3.org/TR/css-backgrounds-3/#border-width),
+[box sizing](https://www.w3.org/TR/css-sizing-3/#box-sizing),
+[custom identifiers](https://www.w3.org/TR/css-values-4/#custom-idents), and
+[CSS Regions named flows](https://drafts.csswg.org/css-regions-1/#the-flow-from-property).
 
 ## CSS absolute units
 

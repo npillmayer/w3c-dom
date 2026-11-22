@@ -21,7 +21,7 @@ func TestComputedStylesDefaultAndMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 	styles := dom.NodeFromStyledNode(root.Payload).ComputedStyles()
-	for key, want := range map[string]style.Property{"color": "default", "word-wrap": "normal", "flow-into": "none", "unknown": ""} {
+	for key, want := range map[string]style.Property{"color": "black", "word-wrap": "normal", "flow-into": "none", "unknown": ""} {
 		if got := styles.GetPropertyValue(key); got != want {
 			t.Errorf("%s = %q, want %q", key, got, want)
 		}

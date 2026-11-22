@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gorilla/css/scanner"
+	"github.com/npillmayer/w3c-dom/internal/csssyntax"
 )
 
 // ErrInvalidValue identifies invalid syntax and inputs that need another stage
@@ -149,58 +150,5 @@ func parseWords(words []string) (Value, error) {
 	return v, nil
 }
 
-// identifier decodes a scanner-validated IDENT. Gorilla's scanner returns raw
-// spellings. Fold only ASCII: Unicode case folding could turn a non-keyword such
-// as blocK into block. Hex escapes consume up to six digits and one whitespace.
-func identifier(raw string) string {
-	var b strings.Builder
-	for i := 0; i < len(raw); {
-		r, size := utf8.DecodeRuneInString(raw[i:])
-		i += size
-		if r == '\\' {
-			var n rune
-			digits := 0
-			for i < len(raw) && digits < 6 {
-				h, ok := hex(raw[i])
-				if !ok {
-					break
-				}
-				n = n*16 + rune(h)
-				i++
-				digits++
-			}
-			if digits > 0 {
-				r = n
-				if r == 0 || r > utf8.MaxRune || r >= 0xD800 && r <= 0xDFFF {
-					r = utf8.RuneError
-				}
-				if i < len(raw) && cssSpace(raw[i]) {
-					i++
-				}
-			} else {
-				r, size = utf8.DecodeRuneInString(raw[i:])
-				i += size
-			}
-		}
-		if r >= 'A' && r <= 'Z' {
-			r += 'a' - 'A'
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
-}
-
-func hex(c byte) (byte, bool) {
-	switch {
-	case c >= '0' && c <= '9':
-		return c - '0', true
-	case c >= 'a' && c <= 'f':
-		return c - 'a' + 10, true
-	case c >= 'A' && c <= 'F':
-		return c - 'A' + 10, true
-	default:
-		return 0, false
-	}
-}
-
-func cssSpace(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' }
+// identifier decodes a scanner-validated IDENT and folds ASCII only.
+func identifier(raw string) string { return csssyntax.Lower(csssyntax.DecodeIdent(raw)) }

@@ -6,7 +6,7 @@ import (
 )
 
 // propertyMetadata is the single registry for the supported property subset.
-// "default" remains a renderer sentinel for colors; this is not a full CSS registry.
+// This is not a full CSS registry. The print UA chooses black as its foreground.
 type propertyMetadata struct {
 	group     string
 	initial   Property
@@ -14,6 +14,8 @@ type propertyMetadata struct {
 }
 
 var propertyRegistry = map[string]propertyMetadata{
+	"box-sizing":   {PGDimension, "content-box", false},
+	"writing-mode": {PGText, "horizontal-tb", true},
 	// CSS leaves the initial family to the UA; this module chooses generic serif.
 	"font-family":                {PGText, "serif", true},
 	"font-size":                  {PGText, "medium", true},
@@ -28,10 +30,10 @@ var propertyRegistry = map[string]propertyMetadata{
 	"padding-left":               {PGPadding, "0", false},
 	"padding-right":              {PGPadding, "0", false},
 	"padding-bottom":             {PGPadding, "0", false},
-	"border-top-color":           {PGBorder, "black", false},
-	"border-left-color":          {PGBorder, "black", false},
-	"border-right-color":         {PGBorder, "black", false},
-	"border-bottom-color":        {PGBorder, "black", false},
+	"border-top-color":           {PGBorder, "currentcolor", false},
+	"border-left-color":          {PGBorder, "currentcolor", false},
+	"border-right-color":         {PGBorder, "currentcolor", false},
+	"border-bottom-color":        {PGBorder, "currentcolor", false},
 	"border-top-width":           {PGBorder, "medium", false},
 	"border-left-width":          {PGBorder, "medium", false},
 	"border-right-width":         {PGBorder, "medium", false},
@@ -46,8 +48,8 @@ var propertyRegistry = map[string]propertyMetadata{
 	"border-bottom-right-radius": {PGBorder, "0", false},
 	"width":                      {PGDimension, "auto", false},
 	"height":                     {PGDimension, "auto", false},
-	"min-width":                  {PGDimension, "none", false},
-	"min-height":                 {PGDimension, "none", false},
+	"min-width":                  {PGDimension, "auto", false},
+	"min-height":                 {PGDimension, "auto", false},
 	"max-width":                  {PGDimension, "none", false},
 	"max-height":                 {PGDimension, "none", false},
 	"flow-from":                  {PGRegion, "none", false},
@@ -56,8 +58,8 @@ var propertyRegistry = map[string]propertyMetadata{
 	"float":                      {PGDisplay, "none", false},
 	"visibility":                 {PGDisplay, "visible", true},
 	"position":                   {PGDisplay, "static", false},
-	"color":                      {PGColor, "default", true},
-	"background-color":           {PGColor, "default", false},
+	"color":                      {PGColor, "black", true},
+	"background-color":           {PGColor, "transparent", false},
 	"direction":                  {PGText, "ltr", true},
 	"white-space":                {PGText, "normal", true},
 	"word-spacing":               {PGText, "normal", true},

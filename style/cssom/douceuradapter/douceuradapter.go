@@ -17,7 +17,6 @@ import (
 	"github.com/aymerick/douceur/parser"
 	"github.com/npillmayer/w3c-dom/style"
 	"github.com/npillmayer/w3c-dom/style/cssom"
-	"github.com/npillmayer/w3c-dom/style/display"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 	"strings"
@@ -84,17 +83,15 @@ func declarationKey(key string) string {
 	return style.CanonicalPropertyKey(strings.ToLower(key))
 }
 
-// winningDeclarations validates display before retaining the last declaration
-// at equal importance. Invalid display values cannot erase earlier valid ones.
+// winningDeclarations validates supported declarations before retaining the last declaration
+// at equal importance. Invalid supported values cannot erase earlier valid ones.
 // Indices preserve the winners' original positions for shorthand/longhand ties.
 func (r Rule) winningDeclarations() map[string]int {
 	winners := make(map[string]int)
 	for i, d := range r.Declarations {
 		key := declarationKey(d.Property)
-		if key == "display" {
-			if _, _, err := display.ParseDeclaration(d.Value); err != nil {
-				continue
-			}
+		if _, err := style.NormalizeDeclaration(key, style.Property(d.Value)); err != nil {
+			continue
 		}
 		previous, exists := winners[key]
 		if !exists || !r.Declarations[previous].Important || d.Important {

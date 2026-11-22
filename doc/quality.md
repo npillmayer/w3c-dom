@@ -103,8 +103,9 @@ return `NullStyle`. Former missing-default tests now assert actual defaults.
 `style/css/inheritance_test.go` checks parent/local precedence, initial barriers,
 non-inherited properties, root/detached nodes, configured defaults, and DOM agreement.
 Defaulting follows [CSS Cascade](https://www.w3.org/TR/css-cascade/#defaulting).
-This is still a supported subset: renderer color sentinels and existing dimension
-conventions remain, `word-wrap` is canonicalized to `overflow-wrap` in storage, defaults, and
+DOM-02 (2026-11-22) replaces registry color sentinels with black/transparent/currentcolor
+and adds checked box-value accessors; the legacy conversion helpers retain compatibility.
+This remains a supported subset. `word-wrap` is canonicalized to `overflow-wrap` in storage, defaults, and
 declaration selection. Alias order and importance are covered for both inline and
 stylesheet declarations, including inherited reads. `revert`, custom-property substitution, font
 resolution, and layout-dependent computation are not implemented.

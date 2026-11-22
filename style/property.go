@@ -12,6 +12,7 @@ Copyright © 2017–2022 Norbert Pillmayer <norbert@pillmayer.com>
 
 import (
 	"fmt"
+	"github.com/npillmayer/w3c-dom/internal/csssyntax"
 	"strings"
 
 	"github.com/npillmayer/schuko/tracing"
@@ -234,7 +235,10 @@ func IsCascading(key string) bool { return propertyRegistry[CanonicalPropertyKey
 // For the logic behind this, refer to e.g.
 // https://www.w3schools.com/css/css_padding.asp .
 func SplitCompoundProperty(key string, value Property) ([]KeyValue, error) {
-	fields := strings.Fields(value.String())
+	fields, err := csssyntax.Components(value.String())
+	if err != nil {
+		return nil, err
+	}
 	switch key {
 	case "margin", "margins": // retain the historical alias
 		return feazeCompound4("margin", "", fourDirs, fields)
