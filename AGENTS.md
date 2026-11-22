@@ -5,6 +5,10 @@
 - Tests are in `dom_test.go` (standard Go `*_test.go`).
 - `w3cdom/` defines W3C DOM interfaces.
 - `style/` contains the CSS styling engine and CSSOM helpers (see `style/README.md`).
+- `style/textstyle` owns checked source font/text snapshots and HTML lang/dir,
+  bdi and emphasis semantics. Keep its values free of typography/font services;
+  adapters explicitly convert DOM DU. See `style/textstyle/README.md` for its
+  supported profile and detached-value/source-context contract.
 - `styledtree/` holds styled tree node types.
 - `domdbg/` provides DOM debugging helpers (GraphViz/DOT and SVG output); sample assets include `dom-example.svg` and `domdbg/test.dot`.
 
@@ -12,7 +16,7 @@
 - `go test ./...` — build and run all tests in the repository.
 - `go test ./style/...` — run styling-specific tests only (if added).
 - `go vet ./...` — static analysis; useful before PRs.
-Note: there is no `go.mod` in this repo; if your environment defaults to modules, you may need a GOPATH setup or a local `go.work` to run tests successfully.
+The module declares Go 1.25.6 and local replacements for sibling tree and schuko.
 
 ## Coding Style & Naming Conventions
 - Use standard Go formatting (`gofmt`); tabs for indentation.

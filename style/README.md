@@ -1,5 +1,9 @@
 # HTML/CSS Styling
 
+For checked, detached source font/text values after cascading, use
+[`style/textstyle`](textstyle/README.md). It owns source inheritance and HTML
+language/direction semantics without depending on a font or typography engine.
+
 We strive to separate content from presentation. In typesetting, this is
 probably an impossible claim, but we'll try anyway. Presentation
 is governed with CSS (Cascading Style Sheets). CSS uses a box model more
