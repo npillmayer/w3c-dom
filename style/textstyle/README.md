@@ -58,6 +58,11 @@ and hyphenation remain separate policies, since that typography type has no
 fields for them. Pagelayout's content projection will retain the complete DOM
 snapshot before creating its preparation adapter.
 
+Use those source font snapshots with `css.GetBorderWithFontContext` for em/rem
+border widths. Its `css.FontContext` accepts the root computed size and a lookup
+for element/ancestor sizes, so inherited widths retain their original computed
+value. See [effective borders](../README.md#effective-borders-and-source-fonts).
+
 Run `go test ./style/textstyle` and `go test -race ./style/textstyle` for source
 inheritance, HTML/CSS precedence, checked values, policies, structured failures,
 snapshot ownership and concurrent calls. Existing tytui extraction, display,

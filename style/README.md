@@ -62,6 +62,51 @@ Callers extract and inspect head stylesheets explicitly before registration.
 Traversal exclusion does not inspect stylesheets or define resource-loading
 policy for them. Pagelayout's CONT-01 adapter supplies those policies.
 
+## Effective borders and source fonts
+
+`css.GetBorder(node, side)` resolves an absolute border in DOM `dimen.DU`.
+`css.GetBorderWithFontContext(node, side, fonts)` additionally resolves `em` and
+`rem`, using computed source fonts supplied in a `css.FontContext`:
+
+```go
+fonts := css.FontContext{
+    RootFontSize: rootStyle.FontSize, // from textstyle.Resolve
+    FontSize: func(node *styledtree.StyNode) (dimen.DU, error) {
+        s, ok := sourceStyles[node] // previously computed textstyle.Style values
+        if !ok {
+            return 0, fmt.Errorf("missing source font snapshot")
+        }
+        return s.FontSize, nil
+    },
+}
+border, err := css.GetBorderWithFontContext(node, "left", fonts)
+// After checking err, convert at the adapter boundary when CSS pixels are needed:
+pixels := float64(border.Width) / float64(dimen.PX)
+```
+
+The callback receives the element whose width is being computed. With explicit
+`inherit`, that may be an ancestor: a parent's `.1em` border at 20px computes to
+2px, and stays 2px when inherited by a child with a 40px font. `rem` uses the
+source document element's computed size, including for that element's borders.
+No receiving frame, containing geometry, font lookup or local CSS parser is
+involved. Keep source ancestry stable while resolving, then retain the detached
+`Border` value with the application's other snapshots.
+
+Both getters retain effective zero widths for `none`/`hidden`, including when
+that zero is inherited. Style/color/currentcolor and CSS-wide keyword behavior
+are shared with the existing checked getters. The context is consulted only for
+nonzero relative widths: `em` needs the element callback, `rem` needs the root
+size, and absolute/zero/suppressed widths need neither. The old `GetBorder` API
+still rejects nonzero relative widths.
+
+Used font sizes must be positive and below `dimen.Fil`. Relative results round
+to nearest DU (half upward); overflow into the reserved/infinite range is an
+error. Nonzero metric/viewport units, border percentages and deferred expressions
+remain unsupported. Failures return a zero Border, preserve callback causes,
+and use `style.ErrInvalidValue` for invalid relative values/context/range.
+As with other effective getters, strict applications must inspect authored CSS
+before permissive cascade reduction discards invalid declarations.
+
 ## Caveats
 
 Browsers are large and complex pieces of software, a fact that implies that

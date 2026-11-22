@@ -18,8 +18,9 @@ func elementProperty(node *styledtree.StyNode, key string) (style.Property, erro
 }
 
 // GetBoxLength resolves defaults/inheritance and returns a checked size or edge.
-// Percentages/relative lengths remain unsized. Use GetBorder for effective border
-// widths (including none/hidden), rather than this raw longhand accessor.
+// Percentages/relative lengths remain unsized. Use GetBorder or
+// GetBorderWithFontContext for effective border widths (including none/hidden),
+// rather than this raw longhand accessor.
 func GetBoxLength(node *styledtree.StyNode, key string) (style.BoxLength, error) {
 	p, err := elementProperty(node, key)
 	if err != nil {
@@ -88,8 +89,12 @@ type Border struct {
 
 // GetBorder resolves one physical side. none/hidden have zero effective width.
 // Inherited widths use the parent's effective width, not its specified width.
-// Nonzero relative widths need font resolution and return an error here.
+// Nonzero relative widths need GetBorderWithFontContext and return an error here.
 func GetBorder(node *styledtree.StyNode, side string) (Border, error) {
+	return getBorder(node, side, nil)
+}
+
+func getBorder(node *styledtree.StyNode, side string, fonts *FontContext) (Border, error) {
 	var b Border
 	var err error
 	b.Style, err = GetBoxKeyword(node, "border-"+side+"-style")
@@ -100,14 +105,14 @@ func GetBorder(node *styledtree.StyNode, side string) (Border, error) {
 	if err != nil {
 		return Border{}, err
 	}
-	b.Width, err = borderWidth(node, side)
+	b.Width, err = borderWidth(node, side, fonts)
 	if err != nil {
 		return Border{}, err
 	}
 	return b, nil
 }
 
-func borderWidth(node *styledtree.StyNode, side string) (dimen.DU, error) {
+func borderWidth(node *styledtree.StyNode, side string, fonts *FontContext) (dimen.DU, error) {
 	lineStyle, err := GetBoxKeyword(node, "border-"+side+"-style")
 	if err != nil {
 		return 0, err
@@ -121,7 +126,7 @@ func borderWidth(node *styledtree.StyNode, side string) (dimen.DU, error) {
 	if style.DeclarationKeyword(string(local)) == "inherit" {
 		parent := styledtree.Node(node.Parent())
 		if parent != nil && parent.HTMLNode().Type == html.ElementNode && !parent.Styles().IsDefaults() {
-			inherited, e := borderWidth(parent, side)
+			inherited, e := borderWidth(parent, side, fonts)
 			if e != nil {
 				return 0, e
 			}
@@ -135,6 +140,9 @@ func borderWidth(node *styledtree.StyNode, side string) (dimen.DU, error) {
 	if width.Kind != style.AbsoluteLength {
 		if width.Kind == style.RelativeLength && width.Magnitude == 0 {
 			return 0, nil
+		}
+		if fonts != nil {
+			return fonts.borderWidth(node, key, width)
 		}
 		return 0, fmt.Errorf("border width requires absolute resolution: %s", key)
 	}

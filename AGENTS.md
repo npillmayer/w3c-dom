@@ -9,6 +9,10 @@
   bdi and emphasis semantics. Keep its values free of typography/font services;
   adapters explicitly convert DOM DU. See `style/textstyle/README.md` for its
   supported profile and detached-value/source-context contract.
+- `style/css.GetBorderWithFontContext` resolves em/rem border widths from
+  source-font snapshots. An inherited width uses its ancestor's computed width,
+  including effective zero for none/hidden; never substitute the child's font.
+  Keep `GetBorder` absolute-only and preserve existing color/cascade semantics.
 - `styledtree/` holds styled tree node types.
 - `domdbg/` provides DOM debugging helpers (GraphViz/DOT and SVG output); sample assets include `dom-example.svg` and `domdbg/test.dot`.
 
