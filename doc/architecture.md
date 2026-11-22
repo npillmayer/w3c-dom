@@ -154,6 +154,28 @@ errors carrying source nodes. The legacy extractor discards those errors.
 `dom.FromHTMLParseTreeWithError` instead aborts construction on any extraction
 error; its legacy wrapper logs and returns nil. No partial DOM is returned.
 
+## CSS source inspection (DOM-01)
+
+`cssom.InspectStylesheet` returns source-ordered rules/declarations, structured
+`Diagnostics`, and a `Sheet` for registration with `AddStylesForScope`. Inspection
+preserves duplicate and invalid declarations before cascade reduction, including
+raw text, importance, one-based rule/declaration ordinals and CSS line/column
+locations. These positions refer to the supplied CSS, not the containing HTML.
+Unsupported at-rules retain their text as opaque rules and receive diagnostics;
+inspection never fetches external resources.
+
+`cssom.InspectInlineStyle` uses the same declaration handling as permissive inline
+styling. Invalid syntax and invalid `display` values are observable before they
+are dropped. Other property value grammars remain the responsibility of later
+validation; a declaration's `Valid` flag does not promise complete CSS support.
+Selector parsing uses the cascade engine's Cascadia parser. Strict callers must
+reject any diagnostics before using the successful subset in `Sheet` or invoking
+`Style`. Ordinary `Style` and the existing douceur adapter remain permissive.
+
+The template loader in `pagelayout/template` uses this explicit reporting path.
+It attaches original HTML source identities to diagnostics, checks shared sheets
+once, and checks inline styles before styling isolated active documents.
+
 ## CSS absolute units
 
 All module units now use CSS definitions: 96 pixels and 72 points per inch.

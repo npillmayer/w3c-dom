@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/andybalholm/cascadia"
-	"github.com/gorilla/css/scanner"
 	"github.com/npillmayer/schuko/tracing"
 	"github.com/npillmayer/tree"
 	"github.com/npillmayer/w3c-dom/style"
@@ -719,99 +718,8 @@ type localPseudoRuleType []localDeclaration
 
 // Tokenize before splitting so strings, URLs and function arguments retain delimiters.
 func newLocalPseudoRule(styleAttr string) localPseudoRuleType {
-	var result localPseudoRuleType
-	var tokens []*scanner.Token
-	depth := 0
-	flush := func() {
-		defer func() { tokens = nil }()
-		significant := make([]*scanner.Token, 0, len(tokens))
-		for _, token := range tokens {
-			if token.Type != scanner.TokenS && token.Type != scanner.TokenComment {
-				significant = append(significant, token)
-			}
-		}
-		if len(significant) < 3 || significant[0].Type != scanner.TokenIdent || significant[1].Value != ":" {
-			return
-		}
-		key := significant[0].Value
-		if !strings.HasPrefix(key, "--") {
-			key = style.CanonicalPropertyKey(strings.ToLower(key))
-		}
-		important := false
-		end := len(tokens)
-		if len(significant) >= 4 && significant[len(significant)-1].Type == scanner.TokenIdent && strings.EqualFold(significant[len(significant)-1].Value, "important") && significant[len(significant)-2].Value == "!" {
-			important = true
-			for i, t := range tokens {
-				if t == significant[len(significant)-2] {
-					end = i
-					break
-				}
-			}
-		}
-		var value strings.Builder
-		started := false
-		for _, t := range tokens[:end] {
-			if !started {
-				if t == significant[1] {
-					started = true
-				}
-				continue
-			}
-			if t.Type == scanner.TokenComment {
-				value.WriteByte(' ')
-			} else {
-				value.WriteString(t.Value)
-			}
-		}
-		v := strings.TrimSpace(value.String())
-		if v == "" {
-			return
-		}
-		// Validate before duplicate reduction: invalid high-priority declarations
-		// must not erase an earlier valid declaration in this same attribute.
-		if key == "display" {
-			if _, _, err := display.ParseDeclaration(v); err != nil {
-				return
-			}
-		}
-		for i, d := range result {
-			if d.Key == key {
-				if d.important && !important {
-					return
-				}
-				result = append(result[:i], result[i+1:]...)
-				break
-			}
-		}
-		result = append(result, localDeclaration{style.KeyValue{Key: key, Value: style.Property(v)}, important})
-	}
-	lexer := scanner.New(styleAttr)
-	for {
-		token := lexer.Next()
-		if token.Type == scanner.TokenError {
-			break
-		}
-		if token.Type == scanner.TokenEOF {
-			if depth == 0 {
-				flush()
-			}
-			break
-		}
-		if token.Type == scanner.TokenChar && token.Value == ";" && depth == 0 {
-			flush()
-			continue
-		}
-		if token.Type == scanner.TokenFunction || (token.Type == scanner.TokenChar && (token.Value == "(" || token.Value == "[" || token.Value == "{")) {
-			depth++
-		}
-		if token.Type == scanner.TokenChar && (token.Value == ")" || token.Value == "]" || token.Value == "}") {
-			if depth > 0 {
-				depth--
-			}
-		}
-		tokens = append(tokens, token)
-	}
-	return result
+	declarations, _ := InspectInlineStyle(styleAttr)
+	return localDeclarations(declarations)
 }
 
 func (pseudorule localPseudoRuleType) Selector() string {
