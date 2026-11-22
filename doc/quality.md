@@ -132,10 +132,15 @@ percentages remain outside the bounded Percent model.
   directional longhands (`margins` remains a compatibility alias). `border-radius`
   emits radius keys in top-left, top-right, bottom-right, bottom-left order, with
   optional slash-separated horizontal/vertical radii. Tests cover one through four
-  values, asymmetric corners, invalid arity, and CSSOM integration. This remains
-  token distribution rather than full CSS grammar validation: functions containing
-  whitespace and invalid value semantics are not validated. Unsupported/invalid
-  shorthands still fall back to raw properties in CSSOM.
+  values, asymmetric corners, invalid arity, and CSSOM integration. DOM-02 adds
+  atomic value validation for supported edge shorthands and preserves function
+  arguments. DOM-03 adds border/side and solid-background forms, reset-only
+  properties, CSS-wide expansion and cascade regressions. Invalid/unsupported
+  values of these recognized shorthands are diagnosed and skipped before
+  duplicate selection; they cannot displace valid earlier declarations.
+  Border-radius remains token distribution without full value validation, and
+  other unimplemented shorthand grammars remain permissive. See
+  [the DOM-03 scope](architecture.md#border-and-solid-background-shorthands-dom-03).
 - **Inline parsing (resolved 2026-11-11):** token-based splitting preserves quoted
   strings, escaped quotes, URLs, and nested delimiters. Duplicate keys select the
   last declaration at equal importance; important declarations beat normal ones.

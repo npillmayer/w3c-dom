@@ -184,15 +184,15 @@ in both inspected and legacy sheets and inline attributes, and again before
 winning effective declarations enter property maps. Invalid higher-priority
 values cannot erase earlier valid ones. DOM-01 retains the invalid source and
 reports `css.invalid-value`. Existing four-sided edge shorthands are validated as
-whole declarations and preserve function arguments; full `border`/`background`
-shorthand/reset semantics remain DOM-03.
+whole declarations and preserve function arguments. DOM-03 adds the selected
+border/background shorthand forms and their reset semantics below.
 
 The supported subset covers physical width/height/min/max sizes, insets, margins,
 padding, border width/style/color, foreground/background color, simple named flows,
 box sizing, writing mode, direction, position, float and visibility. Unknown
 properties remain permissive. CSS-wide tokens are decoded and normalized;
 `revert`/`revert-layer` remain unevaluated and checked accessors return errors.
-Math and variable/environment functions remain opaque in the permissive cascade;
+For the DOM-02 properties, math and variable/environment functions remain opaque in the permissive cascade;
 these functions are not evaluated or fully grammar-validated by this stage.
 Checked accessors reject them until the required evaluation stage exists.
 
@@ -232,6 +232,50 @@ Standards consulted for these contracts: [CSS Color resolving rules](https://www
 [box sizing](https://www.w3.org/TR/css-sizing-3/#box-sizing),
 [custom identifiers](https://www.w3.org/TR/css-values-4/#custom-idents), and
 [CSS Regions named flows](https://drafts.csswg.org/css-regions-1/#the-flow-from-property).
+
+## Border and solid-background shorthands (DOM-03)
+
+`style.SplitCompoundProperty` now expands `border`, the four physical side
+shorthands (`border-top`, etc.), and a solid-color subset of `background`.
+`NormalizeDeclaration` uses the same validator before duplicate reduction;
+invalid or unsupported input produces no partial expansion. DOM-01 keeps the
+original declaration and reports `css.invalid-value`, including for losing or
+unmatched declarations. Permissive styling skips it and retains earlier valid
+values. This replaces the previous opaque handling of these shorthand names.
+
+- `border` and each side accept one or more of width, style and color in any
+  order, with at most one of each. They reuse the checked DOM-02 grammars,
+  including unitless zero, width keywords, relative lengths and color functions.
+  Omitted components reset to `medium`, `none` and `currentcolor`.
+- `border` also resets all five `border-image-*` longhands: source `none`, slice
+  `100%`, width `1`, outset `0`, repeat `stretch`. A side shorthand only changes
+  that side. Neither shorthand resets border radii.
+- `background` accepts a single checked color, optionally with `none` in either
+  order, or `none` alone. It resets color to `transparent`, image to `none`,
+  position to `0% 0%`, size to `auto auto`, repeat to `repeat`, attachment to
+  `scroll`, origin to `padding-box` and clip to `border-box`, then assigns the
+  specified color. It does not reset `background-blend-mode`.
+
+The registry includes non-inherited defaults for these reset properties. This
+adds metadata, not image/background layout or validation of every corresponding
+longhand. Images, gradients, multiple layers, position/size/repeat forms, and
+math/substitution functions in these shorthands remain unsupported and diagnosed.
+Substitution would require a pending-substitution model before resets can be
+applied correctly; it is not silently approximated here.
+
+CSS-wide keywords expand to **all** subproperties, including border-image's
+reset-only properties. Existing defaulting handles `initial`, `inherit` and
+`unset`; `revert`/`revert-layer` remain symbolic and checked accessors report
+their missing evaluation. Every expanded longhand retains the shorthand's
+importance and source order. Existing specificity and inline precedence apply.
+
+Regressions cover grammar/reset sets, atomic rejection, checked colors/borders,
+source diagnostics, and cascade behavior through inline, inspected and legacy
+stylesheet routes. `pagelayout/template` also exercises the actual collection
+sketch (`border: 0`, `background: #ffffff`) in isolated template documents.
+
+The reset sets follow [CSS Backgrounds and Borders Level 3](https://www.w3.org/TR/css-backgrounds-3/);
+CSS-wide and importance propagation follow [CSS Cascade's shorthand rules](https://www.w3.org/TR/css-cascade-5/#shorthand).
 
 ## CSS absolute units
 

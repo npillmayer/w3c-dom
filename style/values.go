@@ -220,12 +220,21 @@ func DeclarationKeyword(input string) string {
 	return ""
 }
 
-// NormalizeDeclaration validates the supported longhands before cascade reduction.
+// NormalizeDeclaration validates supported longhands and shorthands before cascade reduction.
 // Unknown properties and unimplemented shorthand grammars remain permissive.
 // CSS-wide keywords are normalized; revert/revert-layer still require a cascade
 // capability this engine lacks and checked accessors will report them explicitly.
 func NormalizeDeclaration(key string, value Property) (Property, error) {
 	key = CanonicalPropertyKey(csssyntax.Lower(key))
+	if paintShorthand(key) {
+		if _, err := expandPaintShorthand(key, value); err != nil {
+			return NullStyle, err
+		}
+		if wide := DeclarationKeyword(string(value)); wide != "" {
+			return Property(wide), nil
+		}
+		return value, nil
+	}
 	if key == "display" {
 		_, wide, err := display.ParseDeclaration(string(value))
 		if err != nil {

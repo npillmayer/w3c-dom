@@ -235,6 +235,9 @@ func IsCascading(key string) bool { return propertyRegistry[CanonicalPropertyKey
 // For the logic behind this, refer to e.g.
 // https://www.w3schools.com/css/css_padding.asp .
 func SplitCompoundProperty(key string, value Property) ([]KeyValue, error) {
+	if paintShorthand(key) {
+		return expandPaintShorthand(key, value)
+	}
 	fields, err := csssyntax.Components(value.String())
 	if err != nil {
 		return nil, err

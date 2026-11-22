@@ -14,8 +14,22 @@ type propertyMetadata struct {
 }
 
 var propertyRegistry = map[string]propertyMetadata{
-	"box-sizing":   {PGDimension, "content-box", false},
-	"writing-mode": {PGText, "horizontal-tb", true},
+	// Initial values are also the reset values of the paint shorthands. Having
+	// metadata here does not implement image painting or multilayer layout.
+	"background-image":      {PGColor, "none", false},
+	"background-position":   {PGColor, "0% 0%", false},
+	"background-size":       {PGColor, "auto auto", false},
+	"background-repeat":     {PGColor, "repeat", false},
+	"background-attachment": {PGColor, "scroll", false},
+	"background-origin":     {PGColor, "padding-box", false},
+	"background-clip":       {PGColor, "border-box", false},
+	"border-image-source":   {PGBorder, "none", false},
+	"border-image-slice":    {PGBorder, "100%", false},
+	"border-image-width":    {PGBorder, "1", false},
+	"border-image-outset":   {PGBorder, "0", false},
+	"border-image-repeat":   {PGBorder, "stretch", false},
+	"box-sizing":            {PGDimension, "content-box", false},
+	"writing-mode":          {PGText, "horizontal-tb", true},
 	// CSS leaves the initial family to the UA; this module chooses generic serif.
 	"font-family":                {PGText, "serif", true},
 	"font-size":                  {PGText, "medium", true},
