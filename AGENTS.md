@@ -9,6 +9,9 @@
   bdi and emphasis semantics. Keep its values free of typography/font services;
   adapters explicitly convert DOM DU. See `style/textstyle/README.md` for its
   supported profile and detached-value/source-context contract.
+  `ValidateDeclaration` and `ParseKeyword` share that grammar with authored CSS
+  audits; keep relative declaration validation separate from source-context
+  computation and leave narrower content profiles to consumers.
 - `style/css.GetBorderWithFontContext` resolves em/rem border widths from
   source-font snapshots. An inherited width uses its ancestor's computed width,
   including effective zero for none/hidden; never substitute the child's font.

@@ -47,6 +47,20 @@ fractional font weights, advanced whitespace syntax, and cascade rollback
 strict loaders must inspect authored declarations before the permissive CSSOM
 drops invalid or losing declarations. Unrelated properties are not audited here.
 
+`ValidateDeclaration(property, value)` checks authored text-style longhands before
+cascade reduction, including losing and nonmatching declarations. It accepts
+the snapshot's text properties and the keyword forms below, plus CSS-wide
+inherit/initial/unset. Relative font sizes and line-heights are checked without
+inventing a source font size; effective `Resolve` still checks their computed
+range. Unknown properties, unsupported syntax and rollback keywords fail.
+
+`ParseKeyword(property, value)` decodes and checks the keyword form of font-style,
+white-space, direction, unicode-bidi and hyphens. It also supports normal for
+line-height/word-spacing/letter-spacing, normal/break-all/keep-all for word-break,
+and normal/break-word/anywhere for overflow-wrap. It does not accept CSS-wide
+keywords, numbers or lengths. Strict applications such as pagelayout use these
+shared grammar helpers while choosing their own narrower preparation profile.
+
 `*textstyle.Error` carries the original HTML node, property/value and wrapped
 cause, so callers can map diagnostics to their own source identities without
 parsing error text. Errors retain the source node; successful snapshots do not.
@@ -55,7 +69,7 @@ CSS value failures support `errors.Is(err, style.ErrInvalidValue)`.
 The tytui facade maps these values to `typography/style.Style`, explicitly
 converting DOM DU to typography DU and directions to its bidi enum. Line-height
 and hyphenation remain separate policies, since that typography type has no
-fields for them. Pagelayout's content projection will retain the complete DOM
+fields for them. Pagelayout's content projection retains the complete DOM
 snapshot before creating its preparation adapter.
 
 Use those source font snapshots with `css.GetBorderWithFontContext` for em/rem

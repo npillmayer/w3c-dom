@@ -159,7 +159,7 @@ func ResolveWithContext(node *styledtree.StyNode, context Context) (Style, error
 		case "font-weight":
 			s.Weight, err = weight(v, parent.Weight)
 		case "font-style":
-			s.Slant, err = keyword(key, v, "normal italic oblique")
+			s.Slant, err = ParseKeyword(key, v)
 		case "color":
 			var c style.ColorValue
 			c, err = style.ParseColorValue(v)
@@ -175,21 +175,21 @@ func ResolveWithContext(node *styledtree.StyNode, context Context) (Style, error
 				}
 			}
 		case "white-space":
-			s.WhiteSpace, err = keyword(key, v, "normal nowrap pre pre-wrap pre-line break-spaces")
+			s.WhiteSpace, err = ParseKeyword(key, v)
 		case "direction":
 			var word string
-			word, err = keyword(key, v, "ltr rtl")
+			word, err = ParseKeyword(key, v)
 			if word == "rtl" {
 				s.Direction = RightToLeft
 			} else {
 				s.Direction = LeftToRight
 			}
 		case "unicode-bidi":
-			s.UnicodeBidi, err = keyword(key, v, "normal embed isolate bidi-override isolate-override plaintext")
+			s.UnicodeBidi, err = ParseKeyword(key, v)
 		case "line-height":
 			s.LineHeight, err = lineHeight(v, s.FontSize, root)
 		case "hyphens":
-			s.Hyphens, err = keyword(key, v, "none manual auto")
+			s.Hyphens, err = ParseKeyword(key, v)
 		}
 		if err != nil {
 			return Style{}, &Error{Node: h, Property: key, Value: v, Err: err}
