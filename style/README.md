@@ -126,3 +126,18 @@ of package style.
 
 This is a first draft. It is unstable and the API will change without
 notice. Please be patient.
+
+## Read break-before values
+
+Use `style.ParseBoxKeyword("break-before", value)` to check a concrete keyword,
+and `css.GetBoxKeyword(node, "break-before")` to resolve its cascaded value.
+The default is `auto`; the property does not inherit unless explicitly requested.
+The checked vocabulary is `auto`, `avoid`, `avoid-page`, `page`, `left`, `right`,
+`recto`, `verso`, `avoid-column`, `column`, `avoid-region`, and `region`.
+Page-side values remain distinct. Applications can impose a narrower profile.
+
+Declaration normalization handles CSS-wide keywords; effective resolution supports
+`initial`, `inherit`, and `unset`. Unsupported rollback and unresolved substitutions
+produce checked-accessor errors. Stylesheet inspection retains losing and
+nonmatching declarations for application audits. This accessor reads values;
+fragmentation, break propagation and page selection belong to the consumer.

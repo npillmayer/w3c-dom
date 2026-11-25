@@ -72,6 +72,7 @@ var propertyRegistry = map[string]propertyMetadata{
 	"float":                      {PGDisplay, "none", false},
 	"visibility":                 {PGDisplay, "visible", true},
 	"position":                   {PGDisplay, "static", false},
+	"break-before":               {PGDisplay, "auto", false},
 	"color":                      {PGColor, "black", true},
 	"background-color":           {PGColor, "transparent", false},
 	"direction":                  {PGText, "ltr", true},

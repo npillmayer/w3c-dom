@@ -14,6 +14,7 @@ import (
 
 func TestBoxInvalidValuesDoNotWin(t *testing.T) {
 	for _, tc := range []struct{ key, good, bad string }{
+		{"break-before", "recto", "sideways"},
 		{"width", "12px", "-1px"}, {"height", "13px", "garbage"}, {"padding-left", "2px", "-1px"},
 		{"color", "red", "default"}, {"background-color", "transparent", "bogus"},
 		{"border-top-width", "2px", "10%"}, {"border-top-style", "solid", "bogus"},
@@ -119,4 +120,27 @@ func boxNode(t *testing.T, route, decls, extraRules string) *styledtree.StyNode 
 		t.Fatal("missing box")
 	}
 	return result
+}
+
+func TestBreakBeforeInspectionAndCascade(t *testing.T) {
+	r := cssom.InspectStylesheet(`.unmatched {break-before:verso;break-before:page;break-before:bogus!important}`)
+	if len(r.Diagnostics) != 1 || len(r.Rules[0].Declarations) != 3 {
+		t.Fatalf("lost source: %+v", r)
+	}
+	ds := r.Rules[0].Declarations
+	if ds[0].Value != "verso" || ds[1].Value != "page" || ds[2].Valid || !ds[2].Important {
+		t.Fatalf("lost declarations: %+v", ds)
+	}
+	for _, route := range []string{"inspected", "legacy"} {
+		n := boxNode(t, route, `break-before:recto!important`, `#x {break-before:verso}`)
+		got, err := css.GetBoxKeyword(n, "break-before")
+		if err != nil || got != "recto" {
+			t.Fatalf("importance: %s %v", got, err)
+		}
+		n = boxNode(t, route, `break-before:recto`, `#x {break-before:verso}`)
+		got, err = css.GetBoxKeyword(n, "break-before")
+		if err != nil || got != "verso" {
+			t.Fatalf("specificity: %s %v", got, err)
+		}
+	}
 }

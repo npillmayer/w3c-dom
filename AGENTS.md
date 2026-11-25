@@ -19,6 +19,10 @@
 - `styledtree/` holds styled tree node types.
 - `domdbg/` provides DOM debugging helpers (GraphViz/DOT and SVG output); sample assets include `dom-example.svg` and `domdbg/test.dot`.
 
+DOM-SHIP-01: break-before uses the shared ParseBoxKeyword/GetBoxKeyword path,
+with auto default and non-inherited metadata. Preserve all Level 3 keywords
+including page-side distinctions; narrower page profiles belong to consumers.
+
 ## Build, Test, and Development Commands
 - `go test ./...` — build and run all tests in the repository.
 - `go test ./style/...` — run styling-specific tests only (if added).

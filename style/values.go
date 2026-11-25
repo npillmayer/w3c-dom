@@ -180,6 +180,7 @@ func ParseFlowName(input string) (string, error) {
 }
 
 var boxKeywords = map[string]string{
+	"break-before": "auto avoid avoid-page page left right recto verso avoid-column column avoid-region region",
 	"box-sizing":   "content-box border-box",
 	"writing-mode": "horizontal-tb vertical-rl vertical-lr sideways-rl sideways-lr",
 	"direction":    "ltr rtl",
